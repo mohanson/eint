@@ -1,8 +1,12 @@
 pub trait Eint: Clone + Copy + Eq + PartialEq + std::fmt::Debug {
     const BITS: u32;
-    const MIN_U: Self;
     const MAX_U: Self;
+    const MIN_U: Self;
+
+    fn is_negative(self) -> bool;
+    fn overflowing_add_s(self, other: Self) -> (Self, bool);
     fn overflowing_add_u(self, other: Self) -> (Self, bool);
+    fn wrapping_add(self, other: Self) -> Self;
 }
 
 #[macro_export]
@@ -43,9 +47,22 @@ macro_rules! construct_eint_wrap {
             const MIN_U: Self = Self(0);
             const MAX_U: Self = Self(<$uint>::MAX);
 
+            fn is_negative(self) -> bool {
+                (self.0 as $sint).is_negative()
+            }
+
+            fn overflowing_add_s(self, other: Self) -> (Self, bool) {
+                let (r, carry) = (self.0 as $sint).overflowing_add(other.0 as $sint);
+                (Self(r as $uint), carry)
+            }
+
             fn overflowing_add_u(self, other: Self) -> (Self, bool) {
-                let (r, b) = self.0.overflowing_add(other.0);
-                (Self(r), b)
+                let (r, carry) = self.0.overflowing_add(other.0);
+                (Self(r), carry)
+            }
+
+            fn wrapping_add(self, other: Self) -> Self {
+                Self(self.0.wrapping_add(other.0))
             }
         }
     };
@@ -87,11 +104,30 @@ macro_rules! construct_eint_twin {
             const MIN_U: Self = Self(<$half>::MIN_U, <$half>::MIN_U);
             const MAX_U: Self = Self(<$half>::MAX_U, <$half>::MAX_U);
 
+            fn is_negative(self) -> bool {
+                self.1.is_negative()
+            }
+
+            fn overflowing_add_s(self, other: Self) -> (Self, bool) {
+                let r = self.wrapping_add(other);
+                if self.is_negative() == other.is_negative() {
+                    (r, r.is_negative() != self.is_negative())
+                } else {
+                    (r, false)
+                }
+            }
+
             fn overflowing_add_u(self, other: Self) -> (Self, bool) {
                 let (lo, lo_carry) = self.0.overflowing_add_u(other.0);
                 let (hi, hi_carry_0) = self.1.overflowing_add_u(<$half>::from(lo_carry));
                 let (hi, hi_carry_1) = hi.overflowing_add_u(other.1);
                 (Self(lo, hi), hi_carry_0 || hi_carry_1)
+            }
+
+            fn wrapping_add(self, other: Self) -> Self {
+                let (lo, carry) = self.0.overflowing_add_u(other.0);
+                let hi = self.1.wrapping_add(other.1).wrapping_add(<$half>::from(carry));
+                Self(lo, hi)
             }
         }
     };
