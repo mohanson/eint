@@ -15,25 +15,25 @@ pub trait Eint:
     + From<u64>
     + From<u128>
     + PartialEq
+    + std::cmp::Ord
+    + std::cmp::PartialOrd
     + std::fmt::Debug
     + std::fmt::Display
     + std::fmt::LowerHex
+    + std::ops::Add<Output = Self>
+    + std::ops::AddAssign
     + std::ops::BitAnd<Output = Self>
     + std::ops::BitAndAssign
     + std::ops::BitOr<Output = Self>
     + std::ops::BitOrAssign
     + std::ops::BitXor<Output = Self>
     + std::ops::BitXorAssign
-    + std::ops::Neg<Output = Self>
-    + std::ops::Not
-    + std::cmp::Ord
-    + std::cmp::PartialOrd
-    + std::ops::Add<Output = Self>
-    + std::ops::AddAssign
     + std::ops::Div<Output = Self>
     + std::ops::DivAssign
     + std::ops::Mul<Output = Self>
     + std::ops::MulAssign
+    + std::ops::Neg<Output = Self>
+    + std::ops::Not
     + std::ops::Rem<Output = Self>
     + std::ops::RemAssign
     + std::ops::Sub<Output = Self>
@@ -327,6 +327,30 @@ macro_rules! construct_eint_wrap {
         #[derive(Copy, Clone, Default, PartialEq, Eq)]
         pub struct $name(pub $uint);
 
+        construct_eint_wrap_from_uint!($name, $uint, bool);
+        construct_eint_wrap_from_uint!($name, $uint, i8);
+        construct_eint_wrap_from_uint!($name, $uint, i16);
+        construct_eint_wrap_from_uint!($name, $uint, i32);
+        construct_eint_wrap_from_uint!($name, $uint, i64);
+        construct_eint_wrap_from_uint!($name, $uint, i128);
+        construct_eint_wrap_from_uint!($name, $uint, u8);
+        construct_eint_wrap_from_uint!($name, $uint, u16);
+        construct_eint_wrap_from_uint!($name, $uint, u32);
+        construct_eint_wrap_from_uint!($name, $uint, u64);
+        construct_eint_wrap_from_uint!($name, $uint, u128);
+
+        impl std::cmp::Ord for $name {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                self.0.cmp(&other.0)
+            }
+        }
+
+        impl std::cmp::PartialOrd for $name {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                return self.0.partial_cmp(&other.0);
+            }
+        }
+
         impl std::fmt::Debug for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 let suffix = format!("{:x}", self.0);
@@ -354,17 +378,39 @@ macro_rules! construct_eint_wrap {
             }
         }
 
-        construct_eint_wrap_from_uint!($name, $uint, bool);
-        construct_eint_wrap_from_uint!($name, $uint, i8);
-        construct_eint_wrap_from_uint!($name, $uint, i16);
-        construct_eint_wrap_from_uint!($name, $uint, i32);
-        construct_eint_wrap_from_uint!($name, $uint, i64);
-        construct_eint_wrap_from_uint!($name, $uint, i128);
-        construct_eint_wrap_from_uint!($name, $uint, u8);
-        construct_eint_wrap_from_uint!($name, $uint, u16);
-        construct_eint_wrap_from_uint!($name, $uint, u32);
-        construct_eint_wrap_from_uint!($name, $uint, u64);
-        construct_eint_wrap_from_uint!($name, $uint, u128);
+        impl std::ops::Add for $name {
+            type Output = Self;
+            fn add(self, other: Self) -> Self {
+                Self(self.0.wrapping_add(other.0))
+            }
+        }
+
+        impl std::ops::AddAssign for $name {
+            fn add_assign(&mut self, other: Self) {
+                self.0 = self.0.wrapping_add(other.0)
+            }
+        }
+
+        impl std::ops::Div for $name {
+            type Output = Self;
+            fn div(self, other: Self) -> Self::Output {
+                if other.0 == 0 {
+                    Self::MAX_U
+                } else {
+                    Self(self.0.wrapping_div(other.0))
+                }
+            }
+        }
+
+        impl std::ops::DivAssign for $name {
+            fn div_assign(&mut self, other: Self) {
+                self.0 = if other.0 == 0 {
+                    <$uint>::MAX
+                } else {
+                    self.0.wrapping_div(other.0)
+                }
+            }
+        }
 
         impl std::ops::BitAnd for $name {
             type Output = Self;
@@ -405,58 +451,6 @@ macro_rules! construct_eint_wrap {
             }
         }
 
-        impl std::ops::Not for $name {
-            type Output = Self;
-            fn not(self) -> Self::Output {
-                Self(!self.0)
-            }
-        }
-
-        impl std::ops::Neg for $name {
-            type Output = Self;
-            fn neg(self) -> Self::Output {
-                Self((!self.0).wrapping_add(1))
-            }
-        }
-
-        impl std::cmp::PartialOrd for $name {
-            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-                return self.0.partial_cmp(&other.0);
-            }
-        }
-
-        impl std::cmp::Ord for $name {
-            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-                self.0.cmp(&other.0)
-            }
-        }
-
-        impl std::ops::Add for $name {
-            type Output = Self;
-            fn add(self, other: Self) -> Self {
-                Self(self.0.wrapping_add(other.0))
-            }
-        }
-
-        impl std::ops::AddAssign for $name {
-            fn add_assign(&mut self, other: Self) {
-                self.0 = self.0.wrapping_add(other.0)
-            }
-        }
-
-        impl std::ops::Sub for $name {
-            type Output = Self;
-            fn sub(self, other: Self) -> Self::Output {
-                Self(self.0.wrapping_sub(other.0))
-            }
-        }
-
-        impl std::ops::SubAssign for $name {
-            fn sub_assign(&mut self, other: Self) {
-                self.0 = self.0.wrapping_sub(other.0)
-            }
-        }
-
         impl std::ops::Mul for $name {
             type Output = Self;
             fn mul(self, other: Self) -> Self::Output {
@@ -470,24 +464,17 @@ macro_rules! construct_eint_wrap {
             }
         }
 
-        impl std::ops::Div for $name {
+        impl std::ops::Neg for $name {
             type Output = Self;
-            fn div(self, other: Self) -> Self::Output {
-                if other.0 == 0 {
-                    Self::MAX_U
-                } else {
-                    Self(self.0.wrapping_div(other.0))
-                }
+            fn neg(self) -> Self::Output {
+                Self((!self.0).wrapping_add(1))
             }
         }
 
-        impl std::ops::DivAssign for $name {
-            fn div_assign(&mut self, other: Self) {
-                self.0 = if other.0 == 0 {
-                    <$uint>::MAX
-                } else {
-                    self.0.wrapping_div(other.0)
-                }
+        impl std::ops::Not for $name {
+            type Output = Self;
+            fn not(self) -> Self::Output {
+                Self(!self.0)
             }
         }
 
@@ -523,6 +510,19 @@ macro_rules! construct_eint_wrap {
             type Output = Self;
             fn shr(self, other: u32) -> Self::Output {
                 Self(self.0.wrapping_shr(other))
+            }
+        }
+
+        impl std::ops::Sub for $name {
+            type Output = Self;
+            fn sub(self, other: Self) -> Self::Output {
+                Self(self.0.wrapping_sub(other.0))
+            }
+        }
+
+        impl std::ops::SubAssign for $name {
+            fn sub_assign(&mut self, other: Self) {
+                self.0 = self.0.wrapping_sub(other.0)
             }
         }
 
@@ -764,6 +764,30 @@ macro_rules! construct_eint_twin {
         #[derive(Copy, Clone, Default, PartialEq, Eq)]
         pub struct $name(pub $half, pub $half);
 
+        construct_eint_twin_from_uint!($name, $half, bool);
+        construct_eint_twin_from_sint!($name, $half, i8);
+        construct_eint_twin_from_sint!($name, $half, i16);
+        construct_eint_twin_from_sint!($name, $half, i32);
+        construct_eint_twin_from_sint!($name, $half, i64);
+        construct_eint_twin_from_sint!($name, $half, i128);
+        construct_eint_twin_from_uint!($name, $half, u8);
+        construct_eint_twin_from_uint!($name, $half, u16);
+        construct_eint_twin_from_uint!($name, $half, u32);
+        construct_eint_twin_from_uint!($name, $half, u64);
+        construct_eint_twin_from_uint!($name, $half, u128);
+
+        impl std::cmp::PartialOrd for $name {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                Some(self.cmp(other))
+            }
+        }
+
+        impl std::cmp::Ord for $name {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                self.cmp_u(other)
+            }
+        }
+
         impl std::fmt::Debug for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{:x}{:x}", self.1, self.0)
@@ -782,17 +806,18 @@ macro_rules! construct_eint_twin {
             }
         }
 
-        construct_eint_twin_from_uint!($name, $half, bool);
-        construct_eint_twin_from_sint!($name, $half, i8);
-        construct_eint_twin_from_sint!($name, $half, i16);
-        construct_eint_twin_from_sint!($name, $half, i32);
-        construct_eint_twin_from_sint!($name, $half, i64);
-        construct_eint_twin_from_sint!($name, $half, i128);
-        construct_eint_twin_from_uint!($name, $half, u8);
-        construct_eint_twin_from_uint!($name, $half, u16);
-        construct_eint_twin_from_uint!($name, $half, u32);
-        construct_eint_twin_from_uint!($name, $half, u64);
-        construct_eint_twin_from_uint!($name, $half, u128);
+        impl std::ops::Add for $name {
+            type Output = Self;
+            fn add(self, other: Self) -> Self {
+                self.wrapping_add(other)
+            }
+        }
+
+        impl std::ops::AddAssign for $name {
+            fn add_assign(&mut self, other: Self) {
+                *self = self.wrapping_add(other)
+            }
+        }
 
         impl std::ops::BitAnd for $name {
             type Output = Self;
@@ -836,55 +861,16 @@ macro_rules! construct_eint_twin {
             }
         }
 
-        impl std::ops::Not for $name {
+        impl std::ops::Div for $name {
             type Output = Self;
-            fn not(self) -> Self::Output {
-                Self(!self.0, !self.1)
+            fn div(self, other: Self) -> Self::Output {
+                self.wrapping_div_u(other)
             }
         }
 
-        impl std::ops::Neg for $name {
-            type Output = Self;
-            fn neg(self) -> Self::Output {
-                (!self).wrapping_add(<$name>::ONE)
-            }
-        }
-
-        impl std::cmp::PartialOrd for $name {
-            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-
-        impl std::cmp::Ord for $name {
-            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-                self.cmp_u(other)
-            }
-        }
-
-        impl std::ops::Add for $name {
-            type Output = Self;
-            fn add(self, other: Self) -> Self {
-                self.wrapping_add(other)
-            }
-        }
-
-        impl std::ops::AddAssign for $name {
-            fn add_assign(&mut self, other: Self) {
-                *self = self.wrapping_add(other)
-            }
-        }
-
-        impl std::ops::Sub for $name {
-            type Output = Self;
-            fn sub(self, other: Self) -> Self::Output {
-                self.wrapping_sub(other)
-            }
-        }
-
-        impl std::ops::SubAssign for $name {
-            fn sub_assign(&mut self, other: Self) {
-                *self = self.wrapping_sub(other)
+        impl std::ops::DivAssign for $name {
+            fn div_assign(&mut self, other: Self) {
+                *self = self.wrapping_div_u(other)
             }
         }
 
@@ -901,16 +887,17 @@ macro_rules! construct_eint_twin {
             }
         }
 
-        impl std::ops::Div for $name {
+        impl std::ops::Neg for $name {
             type Output = Self;
-            fn div(self, other: Self) -> Self::Output {
-                self.wrapping_div_u(other)
+            fn neg(self) -> Self::Output {
+                (!self).wrapping_add(<$name>::ONE)
             }
         }
 
-        impl std::ops::DivAssign for $name {
-            fn div_assign(&mut self, other: Self) {
-                *self = self.wrapping_div_u(other)
+        impl std::ops::Not for $name {
+            type Output = Self;
+            fn not(self) -> Self::Output {
+                Self(!self.0, !self.1)
             }
         }
 
@@ -938,6 +925,19 @@ macro_rules! construct_eint_twin {
             type Output = Self;
             fn shr(self, other: u32) -> Self::Output {
                 self.wrapping_shr(other)
+            }
+        }
+
+        impl std::ops::Sub for $name {
+            type Output = Self;
+            fn sub(self, other: Self) -> Self::Output {
+                self.wrapping_sub(other)
+            }
+        }
+
+        impl std::ops::SubAssign for $name {
+            fn sub_assign(&mut self, other: Self) {
+                *self = self.wrapping_sub(other)
             }
         }
 
