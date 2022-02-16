@@ -1,15 +1,3 @@
-# Eint
-
-Extended precision integer Rust library. Provides signed/unsigned integer 256 to 2048.
-
-```text
-[dependencies]
-eint = "0.1.0"
-```
-
-# Usage
-
-```rs
 use eint::E256;
 
 fn main() {
@@ -22,18 +10,3 @@ fn main() {
     println!("a * b = {:?}", a * b);
     println!("a / b = {:?}", a / b);
 }
-```
-
-# Test
-
-```sh
-$ cargo test
-```
-
-# Maintainer
-
-mohanson@outlook.com
-
-# License
-
-MIT.
