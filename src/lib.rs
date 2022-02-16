@@ -14,6 +14,7 @@ pub trait Eint:
     + From<u32>
     + From<u64>
     + From<u128>
+    + From<Self>
     + PartialEq
     + std::cmp::Ord
     + std::cmp::PartialOrd
@@ -1299,13 +1300,6 @@ macro_rules! construct_eint_twin {
 }
 
 macro_rules! uint_twin_from_impl {
-    ($name:ident, $half:ty) => {
-        impl std::convert::From<$half> for $name {
-            fn from(small: $half) -> Self {
-                Self(small, <$half>::MIN_U)
-            }
-        }
-    };
     ($name:ident, $half:ty, $from:ty) => {
         impl std::convert::From<$from> for $name {
             fn from(small: $from) -> Self {
@@ -1319,13 +1313,29 @@ construct_eint_twin!(E256, E128);
 construct_eint_twin!(E512, E256);
 construct_eint_twin!(E1024, E512);
 construct_eint_twin!(E2048, E1024);
-uint_twin_from_impl!(E256, E128);
+uint_twin_from_impl!(E256, E128, E8);
+uint_twin_from_impl!(E256, E128, E16);
+uint_twin_from_impl!(E256, E128, E32);
+uint_twin_from_impl!(E256, E128, E64);
+uint_twin_from_impl!(E256, E128, E128);
+uint_twin_from_impl!(E512, E256, E8);
+uint_twin_from_impl!(E512, E256, E16);
+uint_twin_from_impl!(E512, E256, E32);
+uint_twin_from_impl!(E512, E256, E64);
 uint_twin_from_impl!(E512, E256, E128);
-uint_twin_from_impl!(E512, E256);
+uint_twin_from_impl!(E512, E256, E256);
+uint_twin_from_impl!(E1024, E512, E8);
+uint_twin_from_impl!(E1024, E512, E16);
+uint_twin_from_impl!(E1024, E512, E32);
+uint_twin_from_impl!(E1024, E512, E64);
 uint_twin_from_impl!(E1024, E512, E128);
 uint_twin_from_impl!(E1024, E512, E256);
-uint_twin_from_impl!(E1024, E512);
+uint_twin_from_impl!(E1024, E512, E512);
+uint_twin_from_impl!(E2048, E1024, E8);
+uint_twin_from_impl!(E2048, E1024, E16);
+uint_twin_from_impl!(E2048, E1024, E32);
+uint_twin_from_impl!(E2048, E1024, E64);
 uint_twin_from_impl!(E2048, E1024, E128);
 uint_twin_from_impl!(E2048, E1024, E256);
 uint_twin_from_impl!(E2048, E1024, E512);
-uint_twin_from_impl!(E2048, E1024);
+uint_twin_from_impl!(E2048, E1024, E1024);

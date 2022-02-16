@@ -9,8 +9,4 @@ fn main() {
     println!("a - b = {:?}", a - b);
     println!("a * b = {:?}", a * b);
     println!("a / b = {:?}", a / b);
-
-    // let c = eint::E64(1);
-    // let d = E256::from(c);
-    // println!("{:?}", d);
 }
