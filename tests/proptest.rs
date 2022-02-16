@@ -337,7 +337,7 @@ proptest! {
     fn test_wrapping_rem_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
         let r0 = Eint::wrapping_rem_u(E64::from(x), E64::from(y));
         let r1 = Eint::wrapping_rem_u(T64::recv(x), T64::recv(y));
-        let r2 = if y == 0 { 0 } else { x % y };
+        let r2 = if y == 0 { x } else { x % y };
         assert_eq!(r0, r1.into());
         assert_eq!(r0, E64(r2));
     }
