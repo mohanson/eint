@@ -1,3 +1,12 @@
+//! # Eint
+//!
+//! Extended precision integer Rust library. Provides signed/unsigned integer 256 to 2048.
+//!
+//! ```text
+//! [dependencies]
+//! eint = "0.1.2"
+//! ```
+
 pub trait Eint:
     Clone
     + Copy
