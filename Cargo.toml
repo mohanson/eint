@@ -1,9 +1,11 @@
 [package]
 name = "eint"
 version = "0.1.1"
+authors = ["mohanson@outlook.com"]
 edition = "2021"
 description = "Fixed-size signed/unsigned big integers."
 license = "MIT"
+repository = "https://github.com/mohanson/eint"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
