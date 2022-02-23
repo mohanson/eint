@@ -10,6 +10,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+uint = "0.9.3"
 
 [dependencies.eint]
 path = ".."
@@ -21,5 +22,11 @@ members = ["."]
 [[bin]]
 name = "divrem"
 path = "fuzz_targets/divrem.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "mul"
+path = "fuzz_targets/mul.rs"
 test = false
 doc = false
