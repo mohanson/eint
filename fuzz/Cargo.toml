@@ -11,6 +11,8 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 uint = "0.9.3"
+arbitrary = { version = "1.1.0", features = ["derive"] }
+
 
 [dependencies.eint]
 path = ".."
@@ -26,7 +28,7 @@ test = false
 doc = false
 
 [[bin]]
-name = "mul"
-path = "fuzz_targets/mul.rs"
+name = "compare"
+path = "fuzz_targets/compare.rs"
 test = false
 doc = false

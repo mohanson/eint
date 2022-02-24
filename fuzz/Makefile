@@ -1,7 +1,7 @@
 
 # refrence: https://github.com/nervosnetwork/ckb/tree/develop/script/fuzz
 
-TARGET ?= mul
+TARGET ?= compare
 JOBS ?= 40
 TARGET_TRIPLE ?= x86_64-unknown-linux-gnu
 NAME ?= eint
