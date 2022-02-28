@@ -1,170 +1,200 @@
 #![no_main]
-mod utils;
 use eint::{Eint, E256};
 use libfuzzer_sys::fuzz_target;
-use utils::{gen_eint256_pair, gen_uint256_pair};
+use uint::construct_uint;
 
-fn fuzz_mul(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
-
-    let (r, _) = u.a.overflowing_mul(u.b);
-    let r2 = e.a.wrapping_mul(e.b);
-
-    assert_eq!(Into::<E256>::into(r), r2);
+construct_uint! {
+    pub struct U256(4);
 }
 
-fn fuzz_add(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
-
-    let (r, _) = u.a.overflowing_add(u.b);
-    let r2 = e.a.wrapping_add(e.b);
-
-    assert_eq!(Into::<E256>::into(r), r2);
-}
-
-fn fuzz_sub(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
-
-    let (r, _) = u.a.overflowing_sub(u.b);
-    let r2 = e.a.wrapping_sub(e.b);
-
-    assert_eq!(Into::<E256>::into(r), r2);
-}
-
-fn fuzz_shl(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
-
-    let r = u.a << (u.b.low_u32() as u8);
-    let r2 = e.a << (e.b.0 .0 as u8 as u32);
-
-    assert_eq!(Into::<E256>::into(r), r2);
-}
-
-fn fuzz_shr(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
-
-    let r = u.a >> (u.b.low_u32() as u8);
-    let r2 = e.a >> (e.b.0 .0 as u8 as u32);
-
-    assert_eq!(Into::<E256>::into(r), r2);
-}
-
-fn fuzz_div(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
-
-    // being divided by zero is a special case
-    if e.b == E256::MIN_U {
-        return;
+impl std::convert::From<E256> for U256 {
+    fn from(e: E256) -> Self {
+        let mut buf = [0u8; 32];
+        e.put(&mut buf);
+        U256::from_little_endian(&buf)
     }
-    let r = u.a / u.b;
-    let r2 = e.a / e.b;
-
-    assert_eq!(Into::<E256>::into(r), r2);
 }
 
-fn fuzz_rem(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
-
-    // being divided by zero is a special case
-    if e.b == E256::MIN_U {
-        return;
+impl std::convert::From<U256> for E256 {
+    fn from(u: U256) -> Self {
+        let mut buf = [0u8; 32];
+        u.to_little_endian(&mut buf);
+        E256::get(&buf)
     }
-    let r = u.a.checked_rem(u.b).unwrap();
-    let r2 = e.a.wrapping_rem_u(e.b);
-
-    assert_eq!(Into::<E256>::into(r), r2);
 }
 
-fn fuzz_leading_zeros(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
-
-    let r = u.a.leading_zeros();
-    let r2 = e.a.clz();
-
-    assert_eq!(r, r2);
+fn test_and(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    let ru = u0 & u1;
+    let re = e0 & e1;
+    assert_eq!(Into::<E256>::into(ru), re);
 }
 
-fn fuzz_trailing_zeros(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
-
-    let r = u.a.trailing_zeros();
-    let r2 = e.a.ctz();
-
-    assert_eq!(r, r2);
+fn test_clz(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let ru = u0.leading_zeros();
+    let re = e0.clz();
+    assert_eq!(ru, re);
 }
 
-fn fuzz_cmp(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
-
-    let r = u.a < u.b;
-    let r2 = e.a < e.b;
-
-    assert_eq!(r, r2);
+fn test_cmp_u(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    assert_eq!(u0 < u1, e0 < e1);
+    assert_eq!(u0 > u1, e0 > e1);
+    assert_eq!(u0 <= u1, e0 <= e1);
+    assert_eq!(u0 >= u1, e0 >= e1);
+    assert_eq!(u0 == u1, e0 == e1);
+    assert_eq!(u0 != u1, e0 != e1);
 }
 
-fn fuzz_saturating_add(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
-
-    let r = u.a.saturating_add(u.b);
-    let (r2, _) = e.a.saturating_add_u(e.b);
-
-    assert_eq!(Into::<E256>::into(r), r2);
+fn test_ctz(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let ru = u0.trailing_zeros();
+    let re = e0.ctz();
+    assert_eq!(ru, re);
 }
 
-fn fuzz_saturating_sub(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
-
-    let r = u.a.saturating_sub(u.b);
-    let (r2, _) = e.a.saturating_sub_u(e.b);
-
-    assert_eq!(Into::<E256>::into(r), r2);
+fn test_not(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let ru = !u0;
+    let re = !e0;
+    assert_eq!(Into::<E256>::into(ru), re);
 }
 
-fn fuzz_bit_op(data: &[u8]) {
-    let u = gen_uint256_pair(data);
-    let e = gen_eint256_pair(data);
+fn test_or(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    let ru = u0 | u1;
+    let re = e0 | e1;
+    assert_eq!(Into::<E256>::into(ru), re);
+}
 
-    let r = u.a & u.b;
-    let r2 = e.a & e.b;
-    assert_eq!(Into::<E256>::into(r), r2);
+fn test_saturating_add(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    let ru = u0.saturating_add(u1);
+    let (re, _) = e0.saturating_add_u(e1);
+    assert_eq!(Into::<E256>::into(ru), re);
+}
 
-    let r = u.a | u.b;
-    let r2 = e.a | e.b;
-    assert_eq!(Into::<E256>::into(r), r2);
+fn test_saturating_sub(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    let ru = u0.saturating_sub(u1);
+    let (re, _) = e0.saturating_sub_u(e1);
+    assert_eq!(Into::<E256>::into(ru), re);
+}
 
-    let r = u.a ^ u.b;
-    let r2 = e.a ^ e.b;
-    assert_eq!(Into::<E256>::into(r), r2);
+fn test_wrapping_add(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    let (ru, _) = u0.overflowing_add(u1);
+    let re = e0.wrapping_add(e1);
+    assert_eq!(Into::<E256>::into(ru), re);
+}
 
-    let r = !u.a;
-    let r2 = !e.a;
-    assert_eq!(Into::<E256>::into(r), r2);
+fn test_wrapping_div_u(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    let ru = if u1.is_zero() { U256::MAX } else { u0 / u1 };
+    let re = e0 / e1;
+    assert_eq!(Into::<E256>::into(ru), re);
+}
+
+fn test_wrapping_mul(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    let (ru, _) = u0.overflowing_mul(u1);
+    let re = e0.wrapping_mul(e1);
+    assert_eq!(Into::<E256>::into(ru), re);
+}
+
+fn test_wrapping_rem_u(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    let ru = if u1.is_zero() { u0 } else { u0.checked_rem(u1).unwrap() };
+    let re = e0.wrapping_rem_u(e1);
+    assert_eq!(Into::<E256>::into(ru), re);
+}
+
+fn test_wrapping_shl(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    let ru = u0 << (u1.low_u32() as u8);
+    let re = e0 << (e1.u32() % 256);
+    assert_eq!(Into::<E256>::into(ru), re);
+}
+
+fn test_wrapping_shr(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    let ru = u0 >> (u1.low_u32() as u8);
+    let re = e0 >> (e1.u32() % 256);
+    assert_eq!(Into::<E256>::into(ru), re);
+}
+
+fn test_wrapping_sub(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    let (ru, _) = u0.overflowing_sub(u1);
+    let re = e0.wrapping_sub(e1);
+    assert_eq!(Into::<E256>::into(ru), re);
+}
+
+fn test_xor(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let u1 = U256::from_little_endian(&data[0x20..0x40]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let e1 = E256::get(&data[0x20..0x40]);
+    let ru = u0 ^ u1;
+    let re = e0 ^ e1;
+    assert_eq!(Into::<E256>::into(ru), re);
 }
 
 fuzz_target!(|data: [u8; 64]| {
-    fuzz_div(&data);
-    fuzz_rem(&data);
-    fuzz_shl(&data);
-    fuzz_shr(&data);
-    fuzz_mul(&data);
-    fuzz_add(&data);
-    fuzz_sub(&data);
-    fuzz_leading_zeros(&data);
-    fuzz_trailing_zeros(&data);
-    fuzz_cmp(&data);
-    fuzz_saturating_add(&data);
-    fuzz_saturating_sub(&data);
-    fuzz_bit_op(&data);
+    test_and(&data);
+    test_clz(&data);
+    test_cmp_u(&data);
+    test_ctz(&data);
+    test_not(&data);
+    test_or(&data);
+    test_saturating_add(&data);
+    test_saturating_sub(&data);
+    test_wrapping_add(&data);
+    test_wrapping_div_u(&data);
+    test_wrapping_mul(&data);
+    test_wrapping_rem_u(&data);
+    test_wrapping_shl(&data);
+    test_wrapping_shr(&data);
+    test_wrapping_sub(&data);
+    test_xor(&data);
 });
