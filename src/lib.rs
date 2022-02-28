@@ -1050,7 +1050,19 @@ macro_rules! construct_eint_twin {
 
             fn overflowing_mul_s(self, other: Self) -> (Self, bool) {
                 let (lo, hi) = self.widening_mul_s(other);
-                (lo, hi != Self::MIN_U)
+                if !hi.is_negative() {
+                    if hi != Self::MIN_U || lo.is_negative() {
+                        return (lo, true);
+                    } else {
+                        return (lo, false);
+                    }
+                } else {
+                    if hi != Self::MAX_U || lo < Self::MIN_S {
+                        return (lo, true);
+                    } else {
+                        return (lo, false);
+                    }
+                }
             }
 
             fn overflowing_mul_u(self, other: Self) -> (Self, bool) {

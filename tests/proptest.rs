@@ -136,11 +136,11 @@ proptest! {
     fn test_overflowing_mul_s(x in best_numbers(), y in best_numbers()) {
         let (r0, b0) = Eint::overflowing_mul_s(E64::from(x), E64::from(y));
         let (r1, b1) = Eint::overflowing_mul_s(T64::recv(x), T64::recv(y));
-        let r2 = (x as i64 as i128).wrapping_mul(y as i64 as i128) as u128;
+        let (r2, b2) = (x as i64).overflowing_mul(y as i64);
         assert_eq!(r0, r1.into());
         assert_eq!(b0, b1);
         assert_eq!(r0, E64(r2 as u64));
-        assert_eq!(b0, r2 > u64::MAX as u128);
+        assert_eq!(b0, b2);
     }
 
     #[test]
@@ -374,4 +374,31 @@ proptest! {
         let r1 = Eint::wrapping_sub(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
     }
+}
+
+#[test]
+fn test_overflowing_mul_s_bug_0() {
+    let x: u64 = 0x000000ffffffff12;
+    let y: u64 = 0xffffffffffffff00;
+    let (r0, b0) = Eint::overflowing_mul_s(E64::from(x), E64::from(y));
+    let (r1, b1) = Eint::overflowing_mul_s(T64::recv(x), T64::recv(y));
+    let (r2, b2) = (x as i64).overflowing_mul(y as i64);
+    assert_eq!(r0, r1.into());
+    assert_eq!(b0, b1);
+    assert_eq!(r0, E64(r2 as u64));
+    assert_eq!(b0, b2);
+}
+
+#[test]
+fn test_overflowing_mul_s_bug_1() {
+    let x: u64 = 0xffffffff00000000;
+    let y: u64 = 0xffffff12;
+    let (r0, b0) = Eint::overflowing_mul_s(E64::from(x), E64::from(y));
+    let (r1, b1) = Eint::overflowing_mul_s(T64::recv(x), T64::recv(y));
+    let (r2, b2) = (x as i64).overflowing_mul(y as i64);
+    println!("{:x}", (x as i64 as i128).wrapping_mul(y as i64 as i128) as u128);
+    assert_eq!(r0, r1.into());
+    assert_eq!(b0, b1);
+    assert_eq!(r0, E64(r2 as u64));
+    assert_eq!(b0, b2);
 }

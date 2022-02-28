@@ -117,11 +117,11 @@ fn test_overflowing_add_u(x: u64, y: u64) {
 fn test_overflowing_mul_s(x: u64, y: u64) {
     let (r0, b0) = Eint::overflowing_mul_s(E64::from(x), E64::from(y));
     let (r1, b1) = Eint::overflowing_mul_s(T64::recv(x), T64::recv(y));
-    let r2 = (x as i64 as i128).wrapping_mul(y as i64 as i128) as u128;
+    let (r2, b2) = (x as i64).overflowing_mul(y as i64);
     assert_eq!(r0, r1.into());
-    // assert_eq!(b0, b1); // TODO
+    assert_eq!(b0, b1);
     assert_eq!(r0, E64(r2 as u64));
-    // assert_eq!(b0, r2 > u64::MAX as u128); // TODO
+    assert_eq!(b0, b2);
 }
 
 fn test_overflowing_mul_u(x: u64, y: u64) {
