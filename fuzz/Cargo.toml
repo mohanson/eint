@@ -22,20 +22,13 @@ path = ".."
 members = ["."]
 
 [[bin]]
-name = "divrem"
-path = "fuzz_targets/divrem.rs"
+name = "arith_e64"
+path = "fuzz_targets/arith_e64.rs"
 test = false
 doc = false
 
 [[bin]]
-name = "compare"
-path = "fuzz_targets/compare.rs"
+name = "arith_u256"
+path = "fuzz_targets/arith_u256.rs"
 test = false
 doc = false
-
-[[bin]]
-name = "compare2"
-path = "fuzz_targets/compare2.rs"
-test = false
-doc = false
-

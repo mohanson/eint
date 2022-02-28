@@ -368,7 +368,6 @@ fuzz_target!(|data: (u64, u64)| {
     test_wrapping_rem_s(data.0, data.1);
     test_wrapping_rem_u(data.0, data.1);
     test_wrapping_sub(data.0, data.1);
-
     test_wrapping_shl(data.0, data.1 as u32);
     test_wrapping_shr(data.0, data.1 as u32);
     test_wrapping_sra(data.0, data.1 as u32);
