@@ -10,6 +10,9 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+uint = "0.9.3"
+arbitrary = { version = "1.1.0", features = ["derive"] }
+
 
 [dependencies.eint]
 path = ".."
@@ -23,3 +26,16 @@ name = "divrem"
 path = "fuzz_targets/divrem.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "compare"
+path = "fuzz_targets/compare.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "compare2"
+path = "fuzz_targets/compare2.rs"
+test = false
+doc = false
+

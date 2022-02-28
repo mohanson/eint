@@ -1,3 +1,6 @@
+mod best_numbers;
+
+use best_numbers::{best_numbers, best_numbers32};
 use eint::*;
 use proptest::prelude::*;
 
@@ -25,7 +28,7 @@ proptest! {
     })]
 
     #[test]
-    fn test_average_add_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_average_add_s(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::average_add_s(E64::from(x), E64::from(y));
         let r1 = Eint::average_add_s(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
@@ -33,7 +36,7 @@ proptest! {
     }
 
     #[test]
-    fn test_average_add_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_average_add_u(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::average_add_u(E64::from(x), E64::from(y));
         let r1 = Eint::average_add_u(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
@@ -41,7 +44,7 @@ proptest! {
     }
 
     #[test]
-    fn test_average_sub_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_average_sub_s(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::average_sub_s(E64::from(x), E64::from(y));
         let r1 = Eint::average_sub_s(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
@@ -49,7 +52,7 @@ proptest! {
     }
 
     #[test]
-    fn test_average_sub_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_average_sub_u(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::average_sub_u(E64::from(x), E64::from(y));
         let r1 = Eint::average_sub_u(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
@@ -57,7 +60,7 @@ proptest! {
     }
 
     #[test]
-    fn test_clz(x in u64::MIN..=u64::MAX) {
+    fn test_clz(x in best_numbers()) {
         let r0 = E64::from(x).clz();
         let r1 = T64::recv(x).clz();
         assert_eq!(r0, r1);
@@ -65,7 +68,7 @@ proptest! {
     }
 
     #[test]
-    fn test_cmp_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_cmp_s(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::cmp_s(&E64::from(x), &E64::from(y));
         let r1 = Eint::cmp_s(&T64::recv(x), &T64::recv(y));
         let r2 = (x as i64).cmp(&(y as i64));
@@ -74,7 +77,7 @@ proptest! {
     }
 
     #[test]
-    fn test_cmp_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_cmp_u(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::cmp_u(&E64::from(x), &E64::from(y));
         let r1 = Eint::cmp_u(&T64::recv(x), &T64::recv(y));
         let r2 = x.cmp(&y);
@@ -83,7 +86,7 @@ proptest! {
     }
 
     #[test]
-    fn test_cpop(x in u64::MIN..=u64::MAX) {
+    fn test_cpop(x in best_numbers()) {
         let r0 = E64::from(x).cpop();
         let r1 = T64::recv(x).cpop();
         assert_eq!(r0, r1);
@@ -91,7 +94,7 @@ proptest! {
     }
 
     #[test]
-    fn test_ctz(x in u64::MIN..=u64::MAX) {
+    fn test_ctz(x in best_numbers()) {
         let r0 = E64::from(x).ctz();
         let r1 = T64::recv(x).ctz();
         assert_eq!(r0, r1);
@@ -99,14 +102,14 @@ proptest! {
     }
 
     #[test]
-    fn test_is_negative(x in u64::MIN..=u64::MAX) {
+    fn test_is_negative(x in best_numbers()) {
         let r0 = E64::from(x).is_negative();
         let r1 = T64::recv(x).is_negative();
         assert_eq!(r0, r1);
     }
 
     #[test]
-    fn test_is_positive(x in u64::MIN..=u64::MAX) {
+    fn test_is_positive(x in best_numbers()) {
         let r0 = E64::from(x).is_positive();
         let r1 = T64::recv(x).is_positive();
         assert_eq!(r0, r1);
@@ -114,7 +117,7 @@ proptest! {
     }
 
     #[test]
-    fn test_overflowing_add_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_overflowing_add_s(x in best_numbers(), y in best_numbers()) {
         let (r0, b0) = Eint::overflowing_add_s(E64::from(x), E64::from(y));
         let (r1, b1) = Eint::overflowing_add_s(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
@@ -122,7 +125,7 @@ proptest! {
     }
 
     #[test]
-    fn test_overflowing_add_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_overflowing_add_u(x in best_numbers(), y in best_numbers()) {
         let (r0, b0) = Eint::overflowing_add_u(E64::from(x), E64::from(y));
         let (r1, b1) = Eint::overflowing_add_u(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
@@ -130,7 +133,7 @@ proptest! {
     }
 
     #[test]
-    fn test_overflowing_mul_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_overflowing_mul_s(x in best_numbers(), y in best_numbers()) {
         let (r0, b0) = Eint::overflowing_mul_s(E64::from(x), E64::from(y));
         let (r1, b1) = Eint::overflowing_mul_s(T64::recv(x), T64::recv(y));
         let r2 = (x as i64 as i128).wrapping_mul(y as i64 as i128) as u128;
@@ -141,7 +144,7 @@ proptest! {
     }
 
     #[test]
-    fn test_overflowing_mul_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_overflowing_mul_u(x in best_numbers(), y in best_numbers()) {
         let (r0, b0) = Eint::overflowing_mul_u(E64::from(x), E64::from(y));
         let (r1, b1) = Eint::overflowing_mul_u(T64::recv(x), T64::recv(y));
         let (r2, b2) = x.overflowing_mul(y);
@@ -152,7 +155,7 @@ proptest! {
     }
 
     #[test]
-    fn test_overflowing_sub_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_overflowing_sub_s(x in best_numbers(), y in best_numbers()) {
         let (r0, b0) = Eint::overflowing_sub_s(E64::from(x), E64::from(y));
         let (r1, b1) = Eint::overflowing_sub_s(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
@@ -160,7 +163,7 @@ proptest! {
     }
 
     #[test]
-    fn test_overflowing_sub_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_overflowing_sub_u(x in best_numbers(), y in best_numbers()) {
         let (r0, b0) = Eint::overflowing_sub_u(E64::from(x), E64::from(y));
         let (r1, b1) = Eint::overflowing_sub_u(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
@@ -168,7 +171,7 @@ proptest! {
     }
 
     #[test]
-    fn test_saturating_add_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX){
+    fn test_saturating_add_s(x in best_numbers(), y in best_numbers()){
         let (r0, b0) = Eint::saturating_add_s(E64::from(x), E64::from(y));
         let (r1, b1) = Eint::saturating_add_s(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
@@ -177,7 +180,7 @@ proptest! {
     }
 
     #[test]
-    fn test_saturating_add_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX){
+    fn test_saturating_add_u(x in best_numbers(), y in best_numbers()){
         let (r0, b0) = Eint::saturating_add_u(E64::from(x), E64::from(y));
         let (r1, b1) = Eint::saturating_add_u(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
@@ -186,7 +189,7 @@ proptest! {
     }
 
     #[test]
-    fn test_saturating_sub_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX){
+    fn test_saturating_sub_s(x in best_numbers(), y in best_numbers()){
         let (r0, b0) = Eint::saturating_sub_s(E64::from(x), E64::from(y));
         let (r1, b1) = Eint::saturating_sub_s(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
@@ -195,7 +198,7 @@ proptest! {
     }
 
     #[test]
-    fn test_saturating_sub_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX){
+    fn test_saturating_sub_u(x in best_numbers(), y in best_numbers()){
         let (r0, b0) = Eint::saturating_sub_u(E64::from(x), E64::from(y));
         let (r1, b1) = Eint::saturating_sub_u(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
@@ -204,7 +207,7 @@ proptest! {
     }
 
     #[test]
-    fn test_widdening_add_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_widdening_add_s(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::widening_add_s(E64::from(x), E64::from(y));
         let r1 = Eint::widening_add_s(T64::recv(x), T64::recv(y));
         let r2 = x as i64 as i128 + y as i64 as i128;
@@ -215,7 +218,7 @@ proptest! {
     }
 
     #[test]
-    fn test_widdening_add_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_widdening_add_u(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::widening_add_u(E64::from(x), E64::from(y));
         let r1 = Eint::widening_add_u(T64::recv(x), T64::recv(y));
         let r2 = x as u128 + y as u128;
@@ -226,7 +229,7 @@ proptest! {
     }
 
     #[test]
-    fn test_widdening_mul_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_widdening_mul_s(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::widening_mul_s(E64::from(x), E64::from(y));
         let r1 = Eint::widening_mul_s(T64::recv(x), T64::recv(y));
         let r2 = (x as i64 as i128 * y as i64 as i128) as u128;
@@ -237,7 +240,7 @@ proptest! {
     }
 
     #[test]
-    fn test_widdening_mul_su(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_widdening_mul_su(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::widening_mul_su(E64::from(x), E64::from(y));
         let r1 = Eint::widening_mul_su(T64::recv(x), T64::recv(y));
         let r2 = (x as i64 as i128 * y as u128 as i128) as u128;
@@ -248,7 +251,7 @@ proptest! {
     }
 
     #[test]
-    fn test_widdening_mul_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_widdening_mul_u(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::widening_mul_u(E64::from(x), E64::from(y));
         let r1 = Eint::widening_mul_u(T64::recv(x), T64::recv(y));
         let r2 = x as u128 * y as u128;
@@ -259,7 +262,7 @@ proptest! {
     }
 
     #[test]
-    fn test_widdening_sub_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_widdening_sub_s(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::widening_sub_s(E64::from(x), E64::from(y));
         let r1 = Eint::widening_sub_s(T64::recv(x), T64::recv(y));
         let r2 = (x as i64 as i128 - y as i64 as i128) as u128;
@@ -270,7 +273,7 @@ proptest! {
     }
 
     #[test]
-    fn test_widdening_sub_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_widdening_sub_u(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::widening_sub_u(E64::from(x), E64::from(y));
         let r1 = Eint::widening_sub_u(T64::recv(x), T64::recv(y));
         let r2 = (x as u128).wrapping_sub(y as u128);
@@ -281,14 +284,14 @@ proptest! {
     }
 
     #[test]
-    fn test_wrapping_add(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_wrapping_add(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::wrapping_add(E64::from(x), E64::from(y));
         let r1 = Eint::wrapping_add(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
     }
 
     #[test]
-    fn test_wrapping_div_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_wrapping_div_s(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::wrapping_div_s(E64::from(x), E64::from(y));
         let r1 = Eint::wrapping_div_s(T64::recv(x), T64::recv(y));
         let r2 = if y == 0 {
@@ -303,7 +306,7 @@ proptest! {
     }
 
     #[test]
-    fn test_wrapping_div_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_wrapping_div_u(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::wrapping_div_u(E64::from(x), E64::from(y));
         let r1 = Eint::wrapping_div_u(T64::recv(x), T64::recv(y));
         let r2 = if y == 0 { u64::MAX } else { x / y };
@@ -312,14 +315,14 @@ proptest! {
     }
 
     #[test]
-    fn test_wrapping_mul(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_wrapping_mul(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::wrapping_mul(E64::from(x), E64::from(y));
         let r1 = Eint::wrapping_mul(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
     }
 
     #[test]
-    fn test_wrapping_rem_s(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_wrapping_rem_s(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::wrapping_rem_s(E64::from(x), E64::from(y));
         let r1 = Eint::wrapping_rem_s(T64::recv(x), T64::recv(y));
         let r2 = if y == 0 {
@@ -334,7 +337,7 @@ proptest! {
     }
 
     #[test]
-    fn test_wrapping_rem_u(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_wrapping_rem_u(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::wrapping_rem_u(E64::from(x), E64::from(y));
         let r1 = Eint::wrapping_rem_u(T64::recv(x), T64::recv(y));
         let r2 = if y == 0 { x } else { x % y };
@@ -343,21 +346,21 @@ proptest! {
     }
 
     #[test]
-    fn test_wrapping_shl(x in u64::MIN..=u64::MAX, y in u32::MIN..=u32::MAX) {
+    fn test_wrapping_shl(x in best_numbers(), y in best_numbers32()) {
         let r0 = E64::from(x).wrapping_shl(y);
         let r1 = T64::recv(x).wrapping_shl(y);
         assert_eq!(r0, r1.into());
     }
 
     #[test]
-    fn test_wrapping_shr(x in u64::MIN..=u64::MAX, y in u32::MIN..=u32::MAX) {
+    fn test_wrapping_shr(x in best_numbers(), y in best_numbers32()) {
         let r0 = E64::from(x).wrapping_shr(y);
         let r1 = T64::recv(x).wrapping_shr(y);
         assert_eq!(r0, r1.into());
     }
 
     #[test]
-    fn test_wrapping_sra(x in u64::MIN..=u64::MAX, y in u32::MIN..=u32::MAX) {
+    fn test_wrapping_sra(x in best_numbers(), y in best_numbers32()) {
         let r0 = E64::from(x).wrapping_sra(y);
         let r1 = T64::recv(x).wrapping_sra(y);
         let r2 = (x as i64).wrapping_shr(y) as u64;
@@ -366,7 +369,7 @@ proptest! {
     }
 
     #[test]
-    fn test_wrapping_sub(x in u64::MIN..=u64::MAX, y in u64::MIN..=u64::MAX) {
+    fn test_wrapping_sub(x in best_numbers(), y in best_numbers()) {
         let r0 = Eint::wrapping_sub(E64::from(x), E64::from(y));
         let r1 = Eint::wrapping_sub(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
