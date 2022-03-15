@@ -99,6 +99,13 @@ proptest! {
     }
 
     #[test]
+    fn test_get(x in proptest::collection::vec(0..=u8::MAX, 32)) {
+        let r0 = E256::get(&x);
+        let r1 = unsafe { std::mem::transmute::<[u8; 32], E256>(x.as_slice().try_into().unwrap()) };
+        assert_eq!(r0, r1);
+    }
+
+    #[test]
     fn test_is_negative(x in 0..=u64::MAX) {
         let r0 = E64::from(x).is_negative();
         let r1 = T64::recv(x).is_negative();
@@ -165,6 +172,13 @@ proptest! {
         let (r1, b1) = Eint::overflowing_sub_u(T64::recv(x), T64::recv(y));
         assert_eq!(r0, r1.into());
         assert_eq!(b0, b1);
+    }
+
+    #[test]
+    fn test_put(x in proptest::collection::vec(0..=u8::MAX, 32)) {
+        let mut r = [0u8; 32];
+        E256::get(&x).put(&mut r);
+        assert_eq!(x, r);
     }
 
     #[test]
