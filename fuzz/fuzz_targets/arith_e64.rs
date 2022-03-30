@@ -50,6 +50,31 @@ fn test_average_sub_u(x: u64, y: u64) {
     assert_eq!(r0, E64(((x as u128).wrapping_sub(y as u128) >> 1) as u64));
 }
 
+fn test_bit(x: u64, y: u64) {
+    let r0 = E64::from(x).bit(y as u32);
+    let r1 = T64::recv(x).bit(y as u32);
+    assert_eq!(r0, r1);
+    assert_eq!(r0, x.wrapping_shr(y as u32) & 1 != 0);
+}
+
+fn test_bit_clr(x: u64, y: u64) {
+    let mut r0 = E64::from(x);
+    let mut r1 = T64::recv(x);
+    r0.bit_clr(y as u32);
+    r1.bit_clr(y as u32);
+    assert_eq!(r0, r1.into());
+    assert_eq!(r0.0, x & !(1u64.wrapping_shl(y as u32)));
+}
+
+fn test_bit_set(x: u64, y: u64) {
+    let mut r0 = E64::from(x);
+    let mut r1 = T64::recv(x);
+    r0.bit_set(y as u32);
+    r1.bit_set(y as u32);
+    assert_eq!(r0, r1.into());
+    assert_eq!(r0.0, x | 1u64.wrapping_shl(y as u32));
+}
+
 fn test_clz(x: u64, _y: u64) {
     let r0 = E64::from(x).clz();
     let r1 = T64::recv(x).clz();
@@ -337,6 +362,9 @@ fuzz_target!(|data: (u64, u64)| {
     test_average_add_u(data.0, data.1);
     test_average_sub_s(data.0, data.1);
     test_average_sub_u(data.0, data.1);
+    test_bit(data.0, data.1);
+    test_bit_clr(data.0, data.1);
+    test_bit_set(data.0, data.1);
     test_clz(data.0, data.1);
     test_cmp_s(data.0, data.1);
     test_cmp_u(data.0, data.1);

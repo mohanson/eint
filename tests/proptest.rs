@@ -57,6 +57,34 @@ proptest! {
     }
 
     #[test]
+    fn test_bit(x in 0..=u64::MAX, y in 0..=u32::MAX) {
+        let r0 = E64::from(x).bit(y);
+        let r1 = T64::recv(x).bit(y);
+        assert_eq!(r0, r1);
+        assert_eq!(r0, x.wrapping_shr(y) & 1 != 0);
+    }
+
+    #[test]
+    fn test_bit_clr(x in 0..=u64::MAX, y in 0..=u32::MAX) {
+        let mut r0 = E64::from(x);
+        let mut r1 = T64::recv(x);
+        r0.bit_clr(y);
+        r1.bit_clr(y);
+        assert_eq!(r0, r1.into());
+        assert_eq!(r0.0, x & !(1u64.wrapping_shl(y)));
+    }
+
+    #[test]
+    fn test_bit_set(x in 0..=u64::MAX, y in 0..=u32::MAX) {
+        let mut r0 = E64::from(x);
+        let mut r1 = T64::recv(x);
+        r0.bit_set(y);
+        r1.bit_set(y);
+        assert_eq!(r0, r1.into());
+        assert_eq!(r0.0, x | 1u64.wrapping_shl(y));
+    }
+
+    #[test]
     fn test_clz(x in 0..=u64::MAX) {
         let r0 = E64::from(x).clz();
         let r1 = T64::recv(x).clz();

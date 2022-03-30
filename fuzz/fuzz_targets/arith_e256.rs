@@ -33,6 +33,35 @@ fn test_and(data: &[u8]) {
     assert_eq!(Into::<E256>::into(ru), re);
 }
 
+fn test_bit(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let e0 = E256::get(&data[0x00..0x20]);
+    let i = E256::get(&data[0x20..0x40]).u32() % 256;
+    let ru = u0.bit(i as usize);
+    let re = e0.bit(i);
+    assert_eq!(ru, re);
+}
+
+fn test_bit_clr(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let mut e0 = E256::get(&data[0x00..0x20]);
+    let i = E256::get(&data[0x20..0x40]).u32() % 256;
+    let ru = u0 & !(U256::one() << i);
+    e0.bit_clr(i);
+    let re = e0;
+    assert_eq!(Into::<E256>::into(ru), re);
+}
+
+fn test_bit_set(data: &[u8]) {
+    let u0 = U256::from_little_endian(&data[0x00..0x20]);
+    let mut e0 = E256::get(&data[0x00..0x20]);
+    let i = E256::get(&data[0x20..0x40]).u32() % 256;
+    let ru = u0 | (U256::one() << i);
+    e0.bit_set(i);
+    let re = e0;
+    assert_eq!(Into::<E256>::into(ru), re);
+}
+
 fn test_clz(data: &[u8]) {
     let u0 = U256::from_little_endian(&data[0x00..0x20]);
     let e0 = E256::get(&data[0x00..0x20]);
@@ -182,6 +211,9 @@ fn test_xor(data: &[u8]) {
 
 fuzz_target!(|data: [u8; 64]| {
     test_and(&data);
+    test_bit(&data);
+    test_bit_clr(&data);
+    test_bit_set(&data);
     test_clz(&data);
     test_cmp_u(&data);
     test_ctz(&data);

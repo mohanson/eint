@@ -28,7 +28,7 @@ test = false
 doc = false
 
 [[bin]]
-name = "arith_u256"
-path = "fuzz_targets/arith_u256.rs"
+name = "arith_e256"
+path = "fuzz_targets/arith_e256.rs"
 test = false
 doc = false

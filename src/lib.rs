@@ -88,6 +88,15 @@ pub trait Eint:
         }
     }
 
+    /// Get bit.
+    fn bit(&self, n: u32) -> bool;
+
+    /// Clear bit.
+    fn bit_clr(&mut self, n: u32);
+
+    /// Set bit.
+    fn bit_set(&mut self, n: u32);
+
     /// Returns the number of leading zeros in the binary representation of self.
     fn clz(self) -> u32;
 
@@ -545,6 +554,18 @@ macro_rules! construct_eint_wrap {
             const ONE: Self = Self(1);
             const ZERO: Self = Self(0);
 
+            fn bit(&self, n: u32) -> bool {
+                self.0.wrapping_shr(n) & 1 != 0
+            }
+
+            fn bit_clr(&mut self, n: u32) {
+                self.0 &= !<$name>::ONE.0.wrapping_shl(n)
+            }
+
+            fn bit_set(&mut self, n: u32) {
+                self.0 |= <$name>::ONE.0.wrapping_shl(n)
+            }
+
             fn clz(self) -> u32 {
                 self.0.leading_zeros()
             }
@@ -959,6 +980,33 @@ macro_rules! construct_eint_twin {
             const MIN_U: Self = Self(<$half>::MIN_U, <$half>::MIN_U);
             const ONE: Self = Self(<$half>::ONE, <$half>::MIN_U);
             const ZERO: Self = Self(<$half>::MIN_U, <$half>::MIN_U);
+
+            fn bit(&self, n: u32) -> bool {
+                let n = n & (<$name>::BITS - 1);
+                if n < <$half>::BITS {
+                    self.0.bit(n)
+                } else {
+                    self.1.bit(n - <$half>::BITS)
+                }
+            }
+
+            fn bit_clr(&mut self, n: u32) {
+                let n = n & (<$name>::BITS - 1);
+                if n < <$half>::BITS {
+                    self.0.bit_clr(n)
+                } else {
+                    self.1.bit_clr(n - <$half>::BITS)
+                }
+            }
+
+            fn bit_set(&mut self, n: u32) {
+                let n = n & (<$name>::BITS - 1);
+                if n < <$half>::BITS {
+                    self.0.bit_set(n)
+                } else {
+                    self.1.bit_set(n - <$half>::BITS)
+                }
+            }
 
             fn clz(self) -> u32 {
                 if self.1 == <$half>::MIN_U {
