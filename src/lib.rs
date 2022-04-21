@@ -4,7 +4,7 @@
 //!
 //! ```text
 //! [dependencies]
-//! eint = "0.1.2"
+//! eint = "0.1"
 //! ```
 
 #![no_std]
