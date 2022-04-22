@@ -63,7 +63,7 @@ pub trait Eint:
     const ONE: Self;
     const ZERO: Self;
 
-    /// Returns (self + rhs) >> 1.
+    /// Returns (self + rhs) >> 1. Signed.
     fn average_add_s(self, other: Self) -> Self {
         (self & other).wrapping_add((self ^ other).wrapping_sra(1))
     }
@@ -73,7 +73,7 @@ pub trait Eint:
         (self & other).wrapping_add((self ^ other).wrapping_shr(1))
     }
 
-    /// Returns (self - rhs) >> 1.
+    /// Returns (self - rhs) >> 1. Signed.
     fn average_sub_s(self, other: Self) -> Self {
         let (lo, borrow) = self.overflowing_sub_u(other);
         let hi_0 = if !self.is_negative() { Self::MIN_U } else { Self::MAX_U };
@@ -104,7 +104,7 @@ pub trait Eint:
     /// Returns the number of leading zeros in the binary representation of self.
     fn clz(self) -> u32;
 
-    /// Compare signed.
+    /// Compare. Signed.
     fn cmp_s(&self, other: &Self) -> core::cmp::Ordering;
 
     /// Compare.
@@ -134,19 +134,19 @@ pub trait Eint:
     /// Returns the lower part and sign extend it.
     fn lo_sext(self) -> Self;
 
-    /// Calculates self + rhs.
+    /// Calculates self + rhs. Signed.
     fn overflowing_add_s(self, other: Self) -> (Self, bool);
 
     /// Calculates self + rhs.
     fn overflowing_add_u(self, other: Self) -> (Self, bool);
 
-    /// Calculates self * rhs.
+    /// Calculates self * rhs. Signed.
     fn overflowing_mul_s(self, other: Self) -> (Self, bool);
 
     /// Calculates self * rhs.
     fn overflowing_mul_u(self, other: Self) -> (Self, bool);
 
-    /// Calculates self - rhs.
+    /// Calculates self - rhs. Signed.
     fn overflowing_sub_s(self, other: Self) -> (Self, bool);
 
     /// Calculates self - rhs.
@@ -158,7 +158,7 @@ pub trait Eint:
     /// Put the lower part integer as a byte array in little-endian byte order to memory.
     fn put_lo(&self, mem: &mut [u8]);
 
-    /// Saturating integer addition. Computes self + rhs, saturating at the numeric bounds instead of overflowing.
+    /// Saturating integer addition. Computes self + rhs, saturating at the numeric bounds instead of overflowing. Signed.
     fn saturating_add_s(self, other: Self) -> (Self, bool) {
         let r = self.wrapping_add(other);
         if !(self ^ other).is_negative() {
@@ -180,7 +180,7 @@ pub trait Eint:
         }
     }
 
-    /// Saturating integer subtraction. Computes self - rhs, saturating at the numeric bounds instead of overflowing.
+    /// Saturating integer subtraction. Computes self - rhs, saturating at the numeric bounds instead of overflowing. Signed.
     fn saturating_sub_s(self, other: Self) -> (Self, bool) {
         let r = self.wrapping_sub(other);
         if (self ^ other).is_negative() {
@@ -218,7 +218,8 @@ pub trait Eint:
     /// Returns the lower 64 bits.
     fn u64(self) -> u64;
 
-    /// Signed widening add.
+    /// Widening add. Signed.
+    /// (lo, hi) = x + y with the product bits' upper half returned in hi and the lower half returned in lo.
     fn widening_add_s(self, other: Self) -> (Self, Self) {
         let hi_0 = if self.is_negative() { Self::MAX_U } else { Self::MIN_U };
         let hi_1 = if other.is_negative() { Self::MAX_U } else { Self::MIN_U };
@@ -228,13 +229,15 @@ pub trait Eint:
     }
 
     /// Widening add.
+    /// (lo, hi) = x + y with the product bits' upper half returned in hi and the lower half returned in lo.
     fn widening_add_u(self, other: Self) -> (Self, Self) {
         let (lo, carry) = self.overflowing_add_u(other);
         (lo, Self::from(carry))
     }
 
-    /// Signed interger widening multiple.
+    /// Widening multiple. Signed.
     ///
+    /// (lo, hi) = x * y with the product bits' upper half returned in hi and the lower half returned in lo.
     /// Inspired by https://sqlite.in/?qa=668884/c-32-bit-signed-integer-multiplication-without-using-64-bit-data-type
     fn widening_mul_s(self, other: Self) -> (Self, Self) {
         let (lo, hi) = self.widening_mul_u(other);
@@ -245,6 +248,7 @@ pub trait Eint:
     }
 
     /// Widening signed and unsigned integer multiply.
+    /// (lo, hi) = x * y with the product bits' upper half returned in hi and the lower half returned in lo.
     fn widening_mul_su(self, other: Self) -> (Self, Self) {
         if !other.is_negative() {
             self.widening_mul_s(other)
@@ -255,8 +259,8 @@ pub trait Eint:
         }
     }
 
-    /// Function widening_mul returns the product of x and y: (lo, hi) = x * y
-    /// with the product bits' upper half returned in hi and the lower half returned in lo.
+    /// Widening multiple.
+    /// (lo, hi) = x * y with the product bits' upper half returned in hi and the lower half returned in lo.
     ///
     /// See https://pkg.go.dev/math/bits@go1.17.2#Mul64
     fn widening_mul_u(self, other: Self) -> (Self, Self) {
@@ -274,7 +278,8 @@ pub trait Eint:
         (lo, hi)
     }
 
-    /// Signed widening substract.
+    /// Widening substract. Signed.
+    /// (lo, hi) = x - y with the product bits' upper half returned in hi and the lower half returned in lo.
     fn widening_sub_s(self, other: Self) -> (Self, Self) {
         let hi_0 = if self.is_negative() { Self::MAX_U } else { Self::MIN_U };
         let hi_1 = if other.is_negative() { Self::MAX_U } else { Self::MIN_U };
@@ -284,6 +289,7 @@ pub trait Eint:
     }
 
     /// Widening substract.
+    /// (lo, hi) = x - y with the product bits' upper half returned in hi and the lower half returned in lo.
     fn widening_sub_u(self, other: Self) -> (Self, Self) {
         let (lo, borrow) = self.overflowing_sub_u(other);
         (lo, if borrow { Self::MAX_U } else { Self::MIN_U })
@@ -296,7 +302,7 @@ pub trait Eint:
     /// 1) x / 0 = MAX_U
     fn wrapping_div_u(self, other: Self) -> Self;
 
-    /// Wrapping (modular) division signed.
+    /// Wrapping (modular) division. Signed.
     /// 1) x / 0 = -1.
     /// 2) MIN_S / -1 = MIN_S
     fn wrapping_div_s(self, other: Self) -> Self;
@@ -304,7 +310,7 @@ pub trait Eint:
     /// Wrapping (modular) multiplication. Computes self * rhs, wrapping around at the boundary of the type.
     fn wrapping_mul(self, other: Self) -> Self;
 
-    /// Wrapping (modular) remainder signed.
+    /// Wrapping (modular) remainder. Signed.
     /// 1) x % 0 = x
     /// 2) MIN_S % -1 = 0
     fn wrapping_rem_s(self, other: Self) -> Self;

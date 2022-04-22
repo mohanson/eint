@@ -1,4 +1,4 @@
-use eint::E256;
+use eint::{Eint, E256};
 
 fn main() {
     let a = E256::from(u128::MAX);
@@ -9,4 +9,5 @@ fn main() {
     println!("a - b = {:?}", a - b);
     println!("a * b = {:?}", a * b);
     println!("a / b = {:?}", a / b);
+    println!("a.ctz = {:?}", a.ctz());
 }

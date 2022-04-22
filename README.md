@@ -10,7 +10,7 @@ eint = "0.1"
 # Usage
 
 ```rs
-use eint::E256;
+use eint::{E256, Eint};
 
 fn main() {
     let a = E256::from(u128::MAX);
@@ -21,13 +21,22 @@ fn main() {
     println!("a - b = {:?}", a - b);
     println!("a * b = {:?}", a * b);
     println!("a / b = {:?}", a / b);
+    println!("a.ctz = {:?}", a.ctz());
 }
 ```
 
 # Test
 
 ```sh
+# Test
 $ cargo test
+
+# Fuzzing
+$ cargo +nightly fuzz run arith_e64
+$ cargo +nightly fuzz run arith_e256
+
+# Bench
+$ cargo bench
 ```
 
 # Maintainer
