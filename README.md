@@ -25,6 +25,8 @@ fn main() {
 }
 ```
 
+Full docs: [https://docs.rs/eint/latest/eint/](https://docs.rs/eint/latest/eint/)
+
 # Test
 
 ```sh
