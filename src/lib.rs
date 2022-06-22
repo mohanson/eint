@@ -119,6 +119,11 @@ pub trait Eint:
     /// Get a native endian integer value from its representation as a byte slice in little endian.
     fn get(mem: &[u8]) -> Self;
 
+    /// Get a native endian integer value from its representation as a byte slice in little endian.
+    fn get_unsafe(mem: &[u8]) -> Self {
+        unsafe { core::ptr::read(mem.as_ptr() as *const _) }
+    }
+
     /// Returns the higher part.
     fn hi(self) -> Self;
 
