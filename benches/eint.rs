@@ -86,6 +86,18 @@ pub fn e256_wrapping_mul(c: &mut Criterion) {
     c.bench_function("e256_wrapping_mul", |b| b.iter(|| black_box(one.wrapping_mul(two))));
 }
 
+pub fn e256_widening_mul_u(c: &mut Criterion) {
+    let one = E256(
+        E128(0xe2aaa5a70e8d29d2b12f7788023e73f4),
+        E128(0x00000000000923b301f281f891d2d8b6),
+    );
+    let two = E256(
+        E128(0x75bc106493590c971d17f2885f4f575d),
+        E128(0x0000000000000d7d0080fc6291ec2141),
+    );
+    c.bench_function("e256_widening_mul_u", |b| b.iter(|| black_box(one.widening_mul_u(two))));
+}
+
 criterion_group!(
     benches,
     e256_get,
@@ -96,5 +108,6 @@ criterion_group!(
     e256_wrapping_rem_s,
     e256_wrapping_rem_u,
     e256_wrapping_mul,
+    e256_widening_mul_u,
 );
 criterion_main!(benches);
