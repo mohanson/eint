@@ -117,10 +117,7 @@ pub trait Eint:
     fn ctz(self) -> u32;
 
     /// Get a native endian integer value from its representation as a byte slice in little endian.
-    fn get(mem: &[u8]) -> Self;
-
-    /// Get a native endian integer value from its representation as a byte slice in little endian.
-    fn get_unsafe(mem: &[u8]) -> Self {
+    fn get(mem: &[u8]) -> Self {
         unsafe { core::ptr::read(mem.as_ptr() as *const _) }
     }
 
@@ -1160,8 +1157,13 @@ macro_rules! construct_eint_twin {
             }
 
             fn put(&self, mem: &mut [u8]) {
-                self.0.put(&mut mem[0..Self::BITS as usize >> 4]);
-                self.1.put(&mut mem[Self::BITS as usize >> 4..Self::BITS as usize >> 3]);
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        self as *const Self as *const u8,
+                        mem.as_mut_ptr(),
+                        Self::BITS as usize >> 3,
+                    );
+                }
             }
 
             fn put_lo(&self, mem: &mut [u8]) {
