@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 typedef __uint128_t uint128_t;
+typedef __int128_t int128_t;
 
 // HAC, 14.12 Algorithm Multiple-precision multiplication
 // SEW-bit*SEW-bit multiply to generate a 2*SEW-bit product
@@ -38,6 +39,28 @@ void eint_mul(uint64_t *w, uint64_t *x, uint64_t *y, size_t digits_count) {
       w[i + inner_count] = c;
     }
   }
+}
+
+// SEW-bit*SEW-bit addition to generate a SEW-bit result with overflowing flag
+uint64_t eint_add(uint64_t *w, uint64_t *x, uint64_t *y, size_t digits_count) {
+  uint64_t c = 0;
+  for (size_t i = 0; i < digits_count; i++) {
+    uint128_t temp = (uint128_t)x[i] + (uint128_t)y[i] + c;
+    w[i] = (uint64_t)temp;
+    c = *((uint64_t *)&temp + 1);
+  }
+  return c;
+}
+
+// SEW-bit*SEW-bit subtraction to generate a SEW-bit result with borrowing flag
+uint64_t eint_sub(uint64_t *w, uint64_t *x, uint64_t *y, size_t digits_count) {
+  int64_t c = 0;
+  for (size_t i = 0; i < digits_count; i++) {
+    int128_t temp = (int128_t)x[i] - (int128_t)y[i] + c;
+    w[i] = (uint64_t)temp;
+    c = *((int64_t *)&temp + 1);
+  }
+  return (uint64_t)c;
 }
 
 // we should specify digits_count in C code to enable optimization from
