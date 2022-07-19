@@ -10,7 +10,74 @@
 #![no_std]
 extern crate alloc;
 use alloc::{format, string::String};
-pub mod c_impl;
+
+pub trait WideningMulU {
+    fn _widening_mul_u(self, other: Self) -> (Self, Self)
+    where
+        Self: Sized;
+}
+
+#[macro_export]
+macro_rules! impl_widening_mul_u_wrap {
+    ($eint:ty, $wint:ty) => {
+        impl WideningMulU for $eint {
+            fn _widening_mul_u(self, other: Self) -> (Self, Self) {
+                let lh = (self.0 as $wint) * (other.0 as $wint);
+                let l = Self::from(lh);
+                let h = Self::from(lh >> Self::BITS);
+                (l, h)
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_widening_mul_u_u128 {
+    ($eint:ty) => {
+        impl WideningMulU for $eint {
+            fn _widening_mul_u(self, other: Self) -> (Self, Self) {
+                let x0 = self.lo();
+                let x1 = self.hi();
+                let y0 = other.lo();
+                let y1 = other.hi();
+                let w0 = x0.wrapping_mul(y0);
+                let t = x1.wrapping_mul(y0).wrapping_add(w0.hi());
+                let w1 = t.lo();
+                let w2 = t.hi();
+                let w1 = x0.wrapping_mul(y1).wrapping_add(w1);
+                let hi = x1.wrapping_mul(y1).wrapping_add(w2).wrapping_add(w1.hi());
+                let lo = self.wrapping_mul(other);
+                (lo, hi)
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_widening_mul_u_twin {
+    ($eint:ty, $size:expr) => {
+        impl WideningMulU for $eint {
+            fn _widening_mul_u(self, other: Self) -> (Self, Self) {
+                let mut lh = [0u64; $size * 2];
+                for i in 0..$size {
+                    let mut c = 0u64;
+                    for j in 0..$size {
+                        let uv = self.0[j] as u128 * other.0[i] as u128 + lh[i + j] as u128 + c as u128;
+                        lh[i + j] = uv as u64;
+                        c = (uv >> 64) as u64;
+                    }
+                    lh[i + $size] = c;
+                }
+
+                let mut lo = [0u64; $size];
+                lo.copy_from_slice(&lh[0..$size]);
+                let mut hi = [0u64; $size];
+                hi.copy_from_slice(&lh[$size..$size * 2]);
+                (Self(lo), Self(hi))
+            }
+        }
+    };
+}
 
 pub trait Eint:
     Clone
@@ -55,6 +122,7 @@ pub trait Eint:
     + core::ops::SubAssign
     + core::ops::Shl<u32, Output = Self>
     + core::ops::Shr<u32, Output = Self>
+    + WideningMulU
 {
     const BITS: u32;
     const MAX_S: Self;
@@ -103,7 +171,7 @@ pub trait Eint:
     fn bit_set(&mut self, n: u32);
 
     /// Returns the number of leading zeros in the binary representation of self.
-    fn clz(self) -> u32;
+    fn clz(&self) -> u32;
 
     /// Compare. Signed.
     fn cmp_s(&self, other: &Self) -> core::cmp::Ordering;
@@ -112,10 +180,10 @@ pub trait Eint:
     fn cmp_u(&self, other: &Self) -> core::cmp::Ordering;
 
     /// Returns the number of ones in the binary representation of self.
-    fn cpop(self) -> u32;
+    fn cpop(&self) -> u32;
 
     /// Returns the number of trailing zeros in the binary representation of self.
-    fn ctz(self) -> u32;
+    fn ctz(&self) -> u32;
 
     /// Get a native endian integer value from its representation as a byte slice in little endian.
     fn get(mem: &[u8]) -> Self {
@@ -126,10 +194,10 @@ pub trait Eint:
     fn hi(self) -> Self;
 
     /// Returns true if highest bit is set.
-    fn is_negative(self) -> bool;
+    fn is_negative(&self) -> bool;
 
     /// Returns true if highest bit is not set.
-    fn is_positive(self) -> bool;
+    fn is_positive(&self) -> bool;
 
     /// Returns the lower part.
     fn lo(self) -> Self;
@@ -264,21 +332,8 @@ pub trait Eint:
 
     /// Widening multiple.
     /// (lo, hi) = x * y with the product bits' upper half returned in hi and the lower half returned in lo.
-    ///
-    /// See https://pkg.go.dev/math/bits@go1.17.2#Mul64
     fn widening_mul_u(self, other: Self) -> (Self, Self) {
-        let x0 = self.lo();
-        let x1 = self.hi();
-        let y0 = other.lo();
-        let y1 = other.hi();
-        let w0 = x0.wrapping_mul(y0);
-        let t = x1.wrapping_mul(y0).wrapping_add(w0.hi());
-        let w1 = t.lo();
-        let w2 = t.hi();
-        let w1 = x0.wrapping_mul(y1).wrapping_add(w1);
-        let hi = x1.wrapping_mul(y1).wrapping_add(w2).wrapping_add(w1.hi());
-        let lo = self.wrapping_mul(other);
-        (lo, hi)
+        self._widening_mul_u(other)
     }
 
     /// Widening substract. Signed.
@@ -436,11 +491,7 @@ macro_rules! construct_eint_wrap {
 
         impl core::ops::DivAssign for $name {
             fn div_assign(&mut self, other: Self) {
-                self.0 = if other.0 == 0 {
-                    <$uint>::MAX
-                } else {
-                    self.0.wrapping_div(other.0)
-                }
+                self.0 = if other.0 == 0 { <$uint>::MAX } else { self.0.wrapping_div(other.0) }
             }
         }
 
@@ -523,11 +574,7 @@ macro_rules! construct_eint_wrap {
 
         impl core::ops::RemAssign for $name {
             fn rem_assign(&mut self, other: Self) {
-                self.0 = if other.0 == 0 {
-                    self.0
-                } else {
-                    self.0.wrapping_rem(other.0)
-                }
+                self.0 = if other.0 == 0 { self.0 } else { self.0.wrapping_rem(other.0) }
             }
         }
 
@@ -579,7 +626,7 @@ macro_rules! construct_eint_wrap {
                 self.0 |= <$name>::ONE.0.wrapping_shl(n)
             }
 
-            fn clz(self) -> u32 {
+            fn clz(&self) -> u32 {
                 self.0.leading_zeros()
             }
 
@@ -591,11 +638,11 @@ macro_rules! construct_eint_wrap {
                 self.0.cmp(&other.0)
             }
 
-            fn cpop(self) -> u32 {
+            fn cpop(&self) -> u32 {
                 self.0.count_ones()
             }
 
-            fn ctz(self) -> u32 {
+            fn ctz(&self) -> u32 {
                 self.0.trailing_zeros()
             }
 
@@ -609,11 +656,11 @@ macro_rules! construct_eint_wrap {
                 self >> (Self::BITS >> 1)
             }
 
-            fn is_negative(self) -> bool {
+            fn is_negative(&self) -> bool {
                 (self.0 as $sint).is_negative()
             }
 
-            fn is_positive(self) -> bool {
+            fn is_positive(&self) -> bool {
                 (self.0 as $sint).is_positive()
             }
 
@@ -763,6 +810,11 @@ construct_eint_wrap!(E16, u16, i16);
 construct_eint_wrap!(E32, u32, i32);
 construct_eint_wrap!(E64, u64, i64);
 construct_eint_wrap!(E128, u128, i128);
+impl_widening_mul_u_wrap!(E8, u16);
+impl_widening_mul_u_wrap!(E16, u32);
+impl_widening_mul_u_wrap!(E32, u64);
+impl_widening_mul_u_wrap!(E64, u128);
+impl_widening_mul_u_u128!(E128);
 uint_wrap_from_impl!(E16, E8);
 uint_wrap_from_impl!(E32, E8);
 uint_wrap_from_impl!(E32, E16);
@@ -776,10 +828,18 @@ uint_wrap_from_impl!(E128, E64);
 
 #[macro_export]
 macro_rules! construct_eint_twin_from_uint {
-    ($name:ident, $half:ty, $from:ty) => {
+    ($name:ident, $from:ty) => {
         impl core::convert::From<$from> for $name {
             fn from(small: $from) -> Self {
-                Self(<$half>::from(small), <$half>::MIN_U)
+                let mut b = [u64::MIN; Self::BITS as usize >> 6];
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        &small as *const $from as *const u8,
+                        b.as_mut_ptr() as *mut u8,
+                        Self::BITS as usize >> 3,
+                    );
+                }
+                Self(b)
             }
         }
     };
@@ -787,16 +847,22 @@ macro_rules! construct_eint_twin_from_uint {
 
 #[macro_export]
 macro_rules! construct_eint_twin_from_sint {
-    ($name:ident, $half:ty, $from:ty) => {
+    ($name:ident, $from:ty) => {
         impl core::convert::From<$from> for $name {
             fn from(small: $from) -> Self {
-                let lo = <$half>::from(small);
-                let hi = if small >= 0 {
-                    <$half>::MIN_U
+                let mut b = if small >= 0 {
+                    [u64::MIN; Self::BITS as usize >> 6]
                 } else {
-                    <$half>::MAX_U
+                    [u64::MAX; Self::BITS as usize >> 6]
                 };
-                Self(lo, hi)
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        &small as *const $from as *const u8,
+                        b.as_mut_ptr() as *mut u8,
+                        Self::BITS as usize >> 3,
+                    );
+                }
+                Self(b)
             }
         }
     };
@@ -804,21 +870,30 @@ macro_rules! construct_eint_twin_from_sint {
 
 #[macro_export]
 macro_rules! construct_eint_twin {
-    ($name:ident, $half:ty) => {
+    ($name:ident, $size:expr) => {
         #[derive(Copy, Clone, Default, PartialEq, Eq)]
-        pub struct $name(pub $half, pub $half);
+        pub struct $name(pub [u64; $size]);
 
-        construct_eint_twin_from_uint!($name, $half, bool);
-        construct_eint_twin_from_sint!($name, $half, i8);
-        construct_eint_twin_from_sint!($name, $half, i16);
-        construct_eint_twin_from_sint!($name, $half, i32);
-        construct_eint_twin_from_sint!($name, $half, i64);
-        construct_eint_twin_from_sint!($name, $half, i128);
-        construct_eint_twin_from_uint!($name, $half, u8);
-        construct_eint_twin_from_uint!($name, $half, u16);
-        construct_eint_twin_from_uint!($name, $half, u32);
-        construct_eint_twin_from_uint!($name, $half, u64);
-        construct_eint_twin_from_uint!($name, $half, u128);
+        impl core::convert::From<bool> for $name {
+            fn from(small: bool) -> Self {
+                if small {
+                    Self::ONE
+                } else {
+                    Self::MIN_U
+                }
+            }
+        }
+
+        construct_eint_twin_from_sint!($name, i8);
+        construct_eint_twin_from_sint!($name, i16);
+        construct_eint_twin_from_sint!($name, i32);
+        construct_eint_twin_from_sint!($name, i64);
+        construct_eint_twin_from_sint!($name, i128);
+        construct_eint_twin_from_uint!($name, u8);
+        construct_eint_twin_from_uint!($name, u16);
+        construct_eint_twin_from_uint!($name, u32);
+        construct_eint_twin_from_uint!($name, u64);
+        construct_eint_twin_from_uint!($name, u128);
 
         impl core::cmp::PartialOrd for $name {
             fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
@@ -834,19 +909,28 @@ macro_rules! construct_eint_twin {
 
         impl core::fmt::Debug for $name {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                write!(f, "{:x}{:x}", self.1, self.0)
+                for i in self.0.iter().rev() {
+                    write!(f, "{:016x}", i)?
+                }
+                Ok(())
             }
         }
 
         impl core::fmt::Display for $name {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                write!(f, "{:x}{:x}", self.1, self.0)
+                for i in self.0.iter().rev() {
+                    write!(f, "{:016x}", i)?
+                }
+                Ok(())
             }
         }
 
         impl core::fmt::LowerHex for $name {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                write!(f, "{:x}{:x}", self.1, self.0)
+                for i in self.0.iter().rev() {
+                    write!(f, "{:016x}", i)?
+                }
+                Ok(())
             }
         }
 
@@ -866,42 +950,57 @@ macro_rules! construct_eint_twin {
         impl core::ops::BitAnd for $name {
             type Output = Self;
             fn bitand(self, other: Self) -> Self::Output {
-                Self(self.0 & other.0, self.1 & other.1)
+                let mut b = [0u64; $size];
+                for i in 0..$size {
+                    b[i] = self.0[i] & other.0[i];
+                }
+                Self(b)
             }
         }
 
         impl core::ops::BitAndAssign for $name {
             fn bitand_assign(&mut self, other: Self) {
-                self.0 &= other.0;
-                self.1 &= other.1;
+                for i in 0..$size {
+                    self.0[i] &= other.0[i];
+                }
             }
         }
 
         impl core::ops::BitOr for $name {
             type Output = Self;
             fn bitor(self, other: Self) -> Self::Output {
-                Self(self.0 | other.0, self.1 | other.1)
+                let mut b = [0u64; $size];
+                for i in 0..$size {
+                    b[i] = self.0[i] | other.0[i];
+                }
+                Self(b)
             }
         }
 
         impl core::ops::BitOrAssign for $name {
             fn bitor_assign(&mut self, other: Self) {
-                self.0 |= other.0;
-                self.1 |= other.1;
+                for i in 0..$size {
+                    self.0[i] |= other.0[i];
+                }
             }
         }
 
         impl core::ops::BitXor for $name {
             type Output = Self;
             fn bitxor(self, other: Self) -> Self::Output {
-                Self(self.0 ^ other.0, self.1 ^ other.1)
+                let mut b = [0u64; $size];
+                for i in 0..$size {
+                    b[i] = self.0[i] ^ other.0[i];
+                }
+                Self(b)
             }
         }
 
         impl core::ops::BitXorAssign for $name {
             fn bitxor_assign(&mut self, other: Self) {
-                self.0 ^= other.0;
-                self.1 ^= other.1;
+                for i in 0..$size {
+                    self.0[i] ^= other.0[i];
+                }
             }
         }
 
@@ -941,7 +1040,11 @@ macro_rules! construct_eint_twin {
         impl core::ops::Not for $name {
             type Output = Self;
             fn not(self) -> Self::Output {
-                Self(!self.0, !self.1)
+                let mut b = [0u64; $size];
+                for i in 0..$size {
+                    b[i] = !self.0[i];
+                }
+                Self(b)
             }
         }
 
@@ -986,47 +1089,53 @@ macro_rules! construct_eint_twin {
         }
 
         impl Eint for $name {
-            const BITS: u32 = <$half>::BITS * 2;
-            const MAX_S: Self = Self(<$half>::MAX_U, <$half>::MAX_S);
-            const MAX_U: Self = Self(<$half>::MAX_U, <$half>::MAX_U);
-            const MIN_S: Self = Self(<$half>::MIN_U, <$half>::MIN_S);
-            const MIN_U: Self = Self(<$half>::MIN_U, <$half>::MIN_U);
-            const ONE: Self = Self(<$half>::ONE, <$half>::MIN_U);
-            const ZERO: Self = Self(<$half>::MIN_U, <$half>::MIN_U);
+            const BITS: u32 = $size * 64;
+            const MAX_S: Self = {
+                let mut b = [u64::MAX; $size as usize];
+                b[$size as usize - 1] = i64::MAX as u64;
+                Self(b)
+            };
+            const MAX_U: Self = Self([u64::MAX; $size]);
+            const MIN_S: Self = {
+                let mut b = [u64::MIN; $size as usize];
+                b[$size as usize - 1] = i64::MIN as u64;
+                Self(b)
+            };
+            const MIN_U: Self = Self([u64::MIN; $size]);
+            const ONE: Self = {
+                let mut b = [u64::MIN; $size as usize];
+                b[0] = 1;
+                Self(b)
+            };
+            const ZERO: Self = Self([u64::MIN; $size]);
 
             fn bit(&self, n: u32) -> bool {
-                let n = n & (<$name>::BITS - 1);
-                if n < <$half>::BITS {
-                    self.0.bit(n)
-                } else {
-                    self.1.bit(n - <$half>::BITS)
-                }
+                let n = n % Self::BITS;
+                self.0[n as usize / 64] & (1 << (n % 64)) != 0
             }
 
             fn bit_clr(&mut self, n: u32) {
-                let n = n & (<$name>::BITS - 1);
-                if n < <$half>::BITS {
-                    self.0.bit_clr(n)
-                } else {
-                    self.1.bit_clr(n - <$half>::BITS)
-                }
+                let n = n % Self::BITS;
+                self.0[n as usize / 64] &= !(1 << (n % 64))
             }
 
             fn bit_set(&mut self, n: u32) {
-                let n = n & (<$name>::BITS - 1);
-                if n < <$half>::BITS {
-                    self.0.bit_set(n)
-                } else {
-                    self.1.bit_set(n - <$half>::BITS)
-                }
+                let n = n % Self::BITS;
+                self.0[n as usize / 64] |= 1 << (n % 64)
             }
 
-            fn clz(self) -> u32 {
-                if self.1 == <$half>::MIN_U {
-                    Self::BITS / 2 + self.0.clz()
-                } else {
-                    self.1.clz()
+            fn clz(&self) -> u32 {
+                let mut r = 0;
+                for i in 0..$size {
+                    let w = self.0[$size - i - 1];
+                    if w == 0 {
+                        r += 64;
+                    } else {
+                        r += w.leading_zeros();
+                        break;
+                    }
                 }
+                r
             }
 
             fn cmp_s(&self, other: &Self) -> core::cmp::Ordering {
@@ -1041,56 +1150,68 @@ macro_rules! construct_eint_twin {
             }
 
             fn cmp_u(&self, other: &Self) -> core::cmp::Ordering {
-                let hi_cmp = self.1.cmp(&other.1);
-                if hi_cmp != core::cmp::Ordering::Equal {
-                    hi_cmp
-                } else {
-                    self.0.cmp(&other.0)
-                }
+                self.0.iter().rev().cmp(other.0.iter().rev())
             }
 
-            fn cpop(self) -> u32 {
-                self.0.cpop() + self.1.cpop()
+            fn cpop(&self) -> u32 {
+                let mut r = 0;
+                for i in 0..$size {
+                    r += self.0[i].count_ones();
+                }
+                r
             }
 
-            fn ctz(self) -> u32 {
-                if self.0 == <$half>::MIN_U {
-                    Self::BITS / 2 + self.1.ctz()
-                } else {
-                    self.0.ctz()
+            fn ctz(&self) -> u32 {
+                let mut r = 0;
+                for i in 0..$size {
+                    let w = self.0[i];
+                    if w == 0 {
+                        r += 64;
+                    } else {
+                        r += w.trailing_zeros();
+                        break;
+                    }
                 }
+                r
             }
 
             fn get(mem: &[u8]) -> Self {
-                Self(
-                    <$half>::get(&mem[0..Self::BITS as usize >> 4]),
-                    <$half>::get(&mem[Self::BITS as usize >> 4..Self::BITS as usize >> 3]),
-                )
+                let mut b = [0u64; $size];
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        mem.as_ptr() as *const u8,
+                        b.as_mut_ptr() as *mut u8,
+                        Self::BITS as usize >> 3,
+                    );
+                }
+                Self(b)
             }
 
             fn hi(self) -> Self {
-                Self(self.1, <$half>::MIN_U)
+                let mut b = [0u64; $size];
+                b[0..$size / 2].copy_from_slice(&self.0[$size / 2..$size]);
+                Self(b)
             }
 
-            fn is_negative(self) -> bool {
-                self != <$name>::MIN_U && self.wrapping_shr(Self::BITS - 1) == <$name>::ONE
+            fn is_negative(&self) -> bool {
+                (self.0[$size - 1] as i64).is_negative()
             }
 
-            fn is_positive(self) -> bool {
-                self != <$name>::MIN_U && self.wrapping_shr(Self::BITS - 1) == <$name>::MIN_U
+            fn is_positive(&self) -> bool {
+                (self.0[$size - 1] as i64).is_positive()
             }
 
             fn lo(self) -> Self {
-                Self(self.0, <$half>::MIN_U)
+                let mut b = [0u64; $size];
+                b[0..$size / 2].copy_from_slice(&self.0[0..$size / 2]);
+                Self(b)
             }
 
             fn lo_sext(self) -> Self {
-                let hi = if self.0.is_negative() {
-                    <$half>::MAX_U
-                } else {
-                    <$half>::MIN_U
-                };
-                Self(self.0, hi)
+                let mut b =
+                    if (self.0[$size / 2] as i64).is_negative() { [u64::MAX; $size] } else { [u64::MIN; $size] };
+                b[0..$size / 2].copy_from_slice(&self.0[0..$size / 2]);
+                Self(b)
             }
 
             fn overflowing_add_s(self, other: Self) -> (Self, bool) {
@@ -1103,10 +1224,15 @@ macro_rules! construct_eint_twin {
             }
 
             fn overflowing_add_u(self, other: Self) -> (Self, bool) {
-                let (lo, lo_carry) = self.0.overflowing_add_u(other.0);
-                let (hi, hi_carry_1) = self.1.overflowing_add_u(<$half>::from(lo_carry));
-                let (hi, hi_carry_2) = hi.overflowing_add_u(other.1);
-                (Self(lo, hi), hi_carry_1 || hi_carry_2)
+                let mut b = [0u64; $size];
+                let mut carry = false;
+                for i in 0..$size {
+                    let (r0, carry0) = self.0[i].overflowing_add(other.0[i]);
+                    let (r1, carry1) = r0.overflowing_add(carry as u64);
+                    b[i] = r1;
+                    carry = carry0 | carry1
+                }
+                (Self(b), carry)
             }
 
             fn overflowing_mul_s(self, other: Self) -> (Self, bool) {
@@ -1127,18 +1253,8 @@ macro_rules! construct_eint_twin {
             }
 
             fn overflowing_mul_u(self, other: Self) -> (Self, bool) {
-                let (hi, hi_overflow_mul) = match (self.1, other.1) {
-                    (_, <$half>::MIN_U) => self.1.overflowing_mul_u(other.0),
-                    (<$half>::MIN_U, _) => other.1.overflowing_mul_u(self.0),
-                    _ => (
-                        self.1.wrapping_mul(other.0).wrapping_add(other.1.wrapping_mul(self.0)),
-                        true,
-                    ),
-                };
-                let lo = self.0.widening_mul_u(other.0);
-                let (hi, hi_overflow_add) = lo.1.overflowing_add_u(hi);
-                let lo = Self(lo.0, hi);
-                (lo, hi_overflow_mul || hi_overflow_add)
+                let (lo, hi) = self.widening_mul_u(other);
+                (lo, hi != Self::ZERO)
             }
 
             fn overflowing_sub_s(self, other: Self) -> (Self, bool) {
@@ -1151,16 +1267,21 @@ macro_rules! construct_eint_twin {
             }
 
             fn overflowing_sub_u(self, other: Self) -> (Self, bool) {
-                let (lo, lo_borrow) = self.0.overflowing_sub_u(other.0);
-                let (hi, hi_borrow_1) = self.1.overflowing_sub_u(<$half>::from(lo_borrow));
-                let (hi, hi_borrow_2) = hi.overflowing_sub_u(other.1);
-                (Self(lo, hi), hi_borrow_1 || hi_borrow_2)
+                let mut b = [0u64; $size];
+                let mut borrow = false;
+                for i in 0..$size {
+                    let (r0, borrow0) = self.0[i].overflowing_sub(other.0[i]);
+                    let (r1, borrow1) = r0.overflowing_sub(borrow as u64);
+                    b[i] = r1;
+                    borrow = borrow0 | borrow1
+                }
+                (Self(b), borrow)
             }
 
             fn put(&self, mem: &mut [u8]) {
                 unsafe {
                     core::ptr::copy_nonoverlapping(
-                        self as *const Self as *const u8,
+                        self.0.as_ptr() as *const u8,
                         mem.as_mut_ptr(),
                         Self::BITS as usize >> 3,
                     );
@@ -1168,29 +1289,41 @@ macro_rules! construct_eint_twin {
             }
 
             fn put_lo(&self, mem: &mut [u8]) {
-                self.0.put(mem);
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        self.0.as_ptr() as *const u8,
+                        mem.as_mut_ptr(),
+                        Self::BITS as usize >> 4,
+                    );
+                }
             }
 
             fn u8(self) -> u8 {
-                self.0.u8()
+                self.0[0] as u8
             }
 
             fn u16(self) -> u16 {
-                self.0.u16()
+                self.0[0] as u16
             }
 
             fn u32(self) -> u32 {
-                self.0.u32()
+                self.0[0] as u32
             }
 
             fn u64(self) -> u64 {
-                self.0.u64()
+                self.0[0]
             }
 
             fn wrapping_add(self, other: Self) -> Self {
-                let (lo, carry) = self.0.overflowing_add_u(other.0);
-                let hi = self.1.wrapping_add(other.1).wrapping_add(<$half>::from(carry));
-                Self(lo, hi)
+                let mut b = [0u64; $size];
+                let mut carry = false;
+                for i in 0..$size {
+                    let (r0, carry0) = self.0[i].overflowing_add(other.0[i]);
+                    let (r1, carry1) = r0.overflowing_add(carry as u64);
+                    b[i] = r1;
+                    carry = carry0 | carry1
+                }
+                Self(b)
             }
 
             fn wrapping_div_s(self, other: Self) -> Self {
@@ -1212,11 +1345,20 @@ macro_rules! construct_eint_twin {
             }
 
             fn wrapping_mul(self, other: Self) -> Self {
-                let (lo, hi) = self.0.widening_mul_u(other.0);
-                let hi_0 = self.0.wrapping_mul(other.1);
-                let hi_1 = self.1.wrapping_mul(other.0);
-                let hi = hi.wrapping_add(hi_0).wrapping_add(hi_1);
-                Self(lo, hi)
+                let mut b = [0u64; $size];
+                for i in 0..$size {
+                    let mut c = 0u64;
+                    let inner_count = $size - i;
+                    for j in 0..inner_count {
+                        let uv: u128 = (self.0[j] as u128) * other.0[i] as u128 + b[i + j] as u128 + c as u128;
+                        b[i + j] = uv as u64;
+                        c = (uv >> 64) as u64;
+                    }
+                    if ((i + inner_count) < $size) {
+                        b[i + inner_count] = c;
+                    }
+                }
+                Self(b)
             }
 
             fn wrapping_rem_s(self, other: Self) -> Self {
@@ -1241,132 +1383,305 @@ macro_rules! construct_eint_twin {
 
             fn wrapping_shl(self, other: u32) -> Self {
                 let shamt = other % Self::BITS;
-                if shamt < Self::BITS / 2 {
-                    let lo = self.0.wrapping_shl(shamt);
-                    let hi =
-                        self.1.wrapping_shl(shamt) | self.0.wrapping_shr(1).wrapping_shr((Self::BITS / 2) - 1 - shamt);
-                    Self(lo, hi)
-                } else {
-                    let lo = <$half>::MIN_U;
-                    let hi = self.0.wrapping_shl(shamt - Self::BITS / 2);
-                    Self(lo, hi)
+                let mut b = [0u64; $size];
+                let elem_shift = shamt as usize / 64;
+                let bits_shift = shamt as usize % 64;
+                for i in elem_shift..$size {
+                    b[i] = self.0[i - elem_shift] << bits_shift;
                 }
+                if bits_shift != 0 {
+                    for i in elem_shift + 1..$size {
+                        b[i] += self.0[i - 1 - elem_shift] >> (64 - bits_shift);
+                    }
+                }
+                Self(b)
             }
 
             fn wrapping_shr(self, other: u32) -> Self {
                 let shamt = other % Self::BITS;
-                if shamt < Self::BITS / 2 {
-                    let lo =
-                        self.0.wrapping_shr(shamt) | self.1.wrapping_shl(1).wrapping_shl((Self::BITS / 2) - 1 - shamt);
-                    let hi = self.1.wrapping_shr(shamt);
-                    Self(lo, hi)
-                } else {
-                    let lo = self.1.wrapping_shr(shamt - Self::BITS / 2);
-                    let hi = <$half>::MIN_U;
-                    Self(lo, hi)
+                let mut b = [0u64; $size];
+                let elem_shift = shamt as usize / 64;
+                let bits_shift = shamt as usize % 64;
+                for i in elem_shift..$size {
+                    b[i - elem_shift] = self.0[i] >> bits_shift;
                 }
+                if bits_shift != 0 {
+                    for i in elem_shift + 1..$size {
+                        b[i - elem_shift - 1] += self.0[i] << (64 - bits_shift);
+                    }
+                }
+                Self(b)
             }
 
             fn wrapping_sra(self, other: u32) -> Self {
                 let shamt = other % Self::BITS;
-                let hi = if self.is_negative() && shamt != 0 {
-                    Self::MAX_U << (Self::BITS - shamt)
-                } else {
-                    Self::MIN_U
-                };
+                let hi =
+                    if self.is_negative() && shamt != 0 { Self::MAX_U << (Self::BITS - shamt) } else { Self::MIN_U };
                 let lo = self.wrapping_shr(shamt);
                 hi | lo
             }
 
             fn wrapping_sub(self, other: Self) -> Self {
-                let (lo, borrow) = self.0.overflowing_sub_u(other.0);
-                let hi = self.1.wrapping_sub(other.1).wrapping_sub(<$half>::from(borrow));
-                Self(lo, hi)
+                let mut b = [0u64; $size];
+                let mut borrow = false;
+                for i in 0..$size {
+                    let (r0, borrow0) = self.0[i].overflowing_sub(other.0[i]);
+                    let (r1, borrow1) = r0.overflowing_sub(borrow as u64);
+                    b[i] = r1;
+                    borrow = borrow0 | borrow1
+                }
+                Self(b)
             }
         }
 
         impl $name {
-            /// div_half_0 returns the quotient and remainder of (hi, lo) divided by y: quo = (hi, lo)/y,
-            /// rem = (hi, lo)%y with the dividend bits' upper half in parameter hi and the lower half in parameter lo.
-            /// div_half_0 panics for y == 0 (division by zero) or y <= hi (quotient overflow).
-            ///
-            /// See https://cs.opensource.google/go/go/+/refs/tags/go1.17.3:src/math/bits/bits.go;l=512
-            fn div_u_half_0(self, y: $half) -> ($half, $half) {
-                let twos = <$half>::ONE << (Self::BITS / 4);
-                let mask = twos - <$half>::ONE;
-                debug_assert!(y != <$half>::ZERO);
-                debug_assert!(y > self.1);
-                let s = y.clz();
-                let y = y << s;
-                let yn1 = y >> (Self::BITS / 4);
-                let yn0 = y & mask;
-                let un32 = (self.1 << s)
-                    | if s == 0 {
-                        <$half>::ZERO
+            fn words(bits: usize) -> usize {
+                debug_assert!(bits > 0);
+                1 + (bits - 1) / 64
+            }
+
+            #[inline(always)]
+            const fn mul_u64(a: u64, b: u64, carry: u64) -> (u64, u64) {
+                let (hi, lo) = Self::split_u128(a as u128 * b as u128 + carry as u128);
+                (lo, hi)
+            }
+
+            // #[inline(always)]
+            // const fn split(a: u64) -> (u64, u64) {
+            //     (a >> 32, a & 0xFFFF_FFFF)
+            // }
+
+            #[inline(always)]
+            const fn split_u128(a: u128) -> (u64, u64) {
+                ((a >> 64) as _, (a & 0xFFFFFFFFFFFFFFFF) as _)
+            }
+
+            fn overflowing_mul_u64(mut self, other: u64) -> (Self, u64) {
+                let mut carry = 0u64;
+
+                for d in self.0.iter_mut() {
+                    let (res, c) = Self::mul_u64(*d, other, carry);
+                    *d = res;
+                    carry = c;
+                }
+
+                (self, carry)
+            }
+
+            fn full_mul_u64(self, by: u64) -> [u64; $size + 1] {
+                let (prod, carry) = self.overflowing_mul_u64(by);
+                let mut res = [0u64; $size + 1];
+                res[..$size].copy_from_slice(&prod.0[..]);
+                res[$size] = carry;
+                res
+            }
+
+            #[inline(always)]
+            fn div_mod_word(hi: u64, lo: u64, y: u64) -> (u64, u64) {
+                debug_assert!(hi < y);
+                let x = (u128::from(hi) << 64) + u128::from(lo);
+                let y = u128::from(y);
+                ((x / y) as u64, (x % y) as u64)
+            }
+
+            #[inline(always)]
+            fn add_slice(a: &mut [u64], b: &[u64]) -> bool {
+                Self::binop_slice(a, b, u64::overflowing_add)
+            }
+
+            #[inline(always)]
+            fn sub_slice(a: &mut [u64], b: &[u64]) -> bool {
+                Self::binop_slice(a, b, u64::overflowing_sub)
+            }
+
+            #[inline(always)]
+            fn binop_slice(a: &mut [u64], b: &[u64], binop: impl Fn(u64, u64) -> (u64, bool) + Copy) -> bool {
+                let mut c = false;
+                a.iter_mut().zip(b.iter()).for_each(|(x, y)| {
+                    let (res, carry) = Self::binop_carry(*x, *y, c, binop);
+                    *x = res;
+                    c = carry;
+                });
+                c
+            }
+
+            #[inline(always)]
+            fn binop_carry(a: u64, b: u64, c: bool, binop: impl Fn(u64, u64) -> (u64, bool)) -> (u64, bool) {
+                let (res1, overflow1) = b.overflowing_add(u64::from(c));
+                let (res2, overflow2) = binop(a, res1);
+                (res2, overflow1 || overflow2)
+            }
+
+            #[inline]
+            fn fits_word(&self) -> bool {
+                let arr = self.0;
+                for i in 1..$size {
+                    if arr[i] != 0 {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            #[inline]
+            pub fn bits(&self) -> usize {
+                let arr = self.0;
+                for i in 1..$size {
+                    if arr[$size - i] > 0 {
+                        return (0x40 * ($size - i + 1)) - arr[$size - i].leading_zeros() as usize;
+                    }
+                }
+                0x40 - arr[0].leading_zeros() as usize
+            }
+
+            fn full_shl(self, shift: u32) -> [u64; $size + 1] {
+                debug_assert!(shift < 64);
+                let mut u = [0u64; $size + 1];
+                let u_lo = self.0[0] << shift;
+                let u_hi = self >> (64 - shift);
+                u[0] = u_lo;
+                u[1..].copy_from_slice(&u_hi.0[..]);
+                u
+            }
+
+            fn full_shr(u: [u64; $size + 1], shift: u32) -> Self {
+                debug_assert!(shift < 64);
+                let mut res = Self::ZERO;
+                for i in 0..$size {
+                    res.0[i] = u[i] >> shift;
+                }
+                // carry
+                if shift > 0 {
+                    for i in 1..=$size {
+                        res.0[i - 1] |= u[i] << (64 - shift);
+                    }
+                }
+                res
+            }
+
+            fn div_mod_small(mut self, other: u64) -> (Self, Self) {
+                let mut rem = 0u64;
+                self.0.iter_mut().rev().for_each(|d| {
+                    let (q, r) = Self::div_mod_word(rem, *d, other);
+                    *d = q;
+                    rem = r;
+                });
+                (self, rem.into())
+            }
+
+            // See Knuth, TAOCP, Volume 2, section 4.3.1, Algorithm D.
+            fn div_mod_knuth(self, mut v: Self, n: usize, m: usize) -> (Self, Self) {
+                debug_assert!(self.bits() >= v.bits() && !v.fits_word());
+                debug_assert!(n + m <= $size);
+                // D1.
+                // Make sure 64th bit in v's highest word is set.
+                // If we shift both self and v, it won't affect the quotient
+                // and the remainder will only need to be shifted back.
+                let shift = v.0[n - 1].leading_zeros();
+                v = v << shift;
+                // u will store the remainder (shifted)
+                let mut u = self.full_shl(shift);
+
+                // quotient
+                let mut q = Self::ZERO;
+                let v_n_1 = v.0[n - 1];
+                let v_n_2 = v.0[n - 2];
+
+                // D2. D7.
+                // iterate from m downto 0
+                for j in (0..=m).rev() {
+                    let u_jn = u[j + n];
+
+                    // D3.
+                    // q_hat is our guess for the j-th quotient digit
+                    // q_hat = min(b - 1, (u_{j+n} * b + u_{j+n-1}) / v_{n-1})
+                    // b = 1 << WORD_BITS
+                    // Theorem B: q_hat >= q_j >= q_hat - 2
+                    let mut q_hat = if u_jn < v_n_1 {
+                        let (mut q_hat, mut r_hat) = Self::div_mod_word(u_jn, u[j + n - 1], v_n_1);
+                        // this loop takes at most 2 iterations
+                        loop {
+                            // check if q_hat * v_{n-2} > b * r_hat + u_{j+n-2}
+                            let (hi, lo) = Self::split_u128(u128::from(q_hat) * u128::from(v_n_2));
+                            if (hi, lo) <= (r_hat, u[j + n - 2]) {
+                                break;
+                            }
+                            // then iterate till it doesn't hold
+                            q_hat -= 1;
+                            let (new_r_hat, overflow) = r_hat.overflowing_add(v_n_1);
+                            r_hat = new_r_hat;
+                            // if r_hat overflowed, we're done
+                            if overflow {
+                                break;
+                            }
+                        }
+                        q_hat
                     } else {
-                        self.0 >> (Self::BITS / 2 - s)
+                        // here q_hat >= q_j >= q_hat - 1
+                        u64::max_value()
                     };
-                let un10 = self.0 << s;
-                let un1 = un10 >> (Self::BITS / 4);
-                let un0 = un10 & mask;
-                let mut q1 = un32 / yn1;
-                let mut rhat = un32 - q1 * yn1;
-                while q1 >= twos || q1 * yn0 > twos * rhat + un1 {
-                    q1 -= <$half>::ONE;
-                    rhat += yn1;
-                    if rhat >= twos {
-                        break;
+
+                    // ex. 20:
+                    // since q_hat * v_{n-2} <= b * r_hat + u_{j+n-2},
+                    // either q_hat == q_j, or q_hat == q_j + 1
+
+                    // D4.
+                    // let's assume optimistically q_hat == q_j
+                    // subtract (q_hat * v) from u[j..]
+                    let q_hat_v = v.full_mul_u64(q_hat);
+                    // u[j..] -= q_hat_v;
+                    let c = Self::sub_slice(&mut u[j..], &q_hat_v[..n + 1]);
+
+                    // D6.
+                    // actually, q_hat == q_j + 1 and u[j..] has overflowed
+                    // highly unlikely ~ (1 / 2^63)
+                    if c {
+                        q_hat -= 1;
+                        // add v to u[j..]
+                        let c = Self::add_slice(&mut u[j..], &v.0[..n]);
+                        u[j + n] = u[j + n].wrapping_add(u64::from(c));
                     }
+
+                    // D5.
+                    q.0[j] = q_hat;
                 }
-                let un21 = un32 * twos + un1 - q1 * y;
-                let mut q0 = un21 / yn1;
-                rhat = un21 - q0 * yn1;
-                while q0 >= twos || q0 * yn0 > twos * rhat + un0 {
-                    q0 -= <$half>::ONE;
-                    rhat += yn1;
-                    if rhat >= twos {
-                        break;
-                    }
-                }
-                (q1 * twos + q0, (un21 * twos + un0 - q0 * y) >> s)
+
+                // D8.
+                let remainder = Self::full_shr(u, shift);
+
+                (q, remainder)
             }
 
-            /// See https://github.com/Pilatuz/bigx/blob/8615506d17c5/uint128.go#L319
-            fn div_u_half_1(self, y: $half) -> (Self, $half) {
-                if self.1 < y {
-                    let (lo, r) = self.div_u_half_0(y);
-                    (Self::from(lo), r)
-                } else {
-                    let (hi, r) = Self::from(self.1).div_u_half_0(y);
-                    let (lo, r) = Self(self.0, r).div_u_half_0(y);
-                    (Self(lo, hi), r)
+            pub fn div_mod(self, other: Self) -> (Self, Self) {
+                // use core::cmp::Ordering;
+
+                let my_bits = self.bits();
+                let your_bits = other.bits();
+
+                assert!(your_bits != 0, "division by zero");
+
+                // Early return in case we are dividing by a larger number than us
+                if my_bits < your_bits {
+                    return (Self::ZERO, self);
                 }
+
+                if your_bits <= 64 {
+                    return self.div_mod_small(other.u64());
+                }
+
+                let (n, m) = {
+                    let my_words = Self::words(my_bits);
+                    let your_words = Self::words(your_bits);
+                    (your_words, my_words - your_words)
+                };
+
+                self.div_mod_knuth(other, n, m)
             }
 
-            /// See https://github.com/Pilatuz/bigx/blob/8615506d17c5/uint128.go#L291
             fn div_u(self, other: Self) -> (Self, Self) {
-                if other.1 == <$half>::ZERO {
-                    let (q, r) = self.div_u_half_1(other.0);
-                    return (q, Self::from(r));
-                }
-                let n = other.1.clz();
-                let u1 = self >> 1;
-                let v1 = other << n;
-                let (tq, _) = u1.div_u_half_0(v1.1);
-                let mut tq = tq >> (Self::BITS / 2 - 1 - n);
-                if tq != <$half>::ZERO {
-                    tq -= <$half>::ONE;
-                }
-                let mut q = Self::from(tq);
-                let mut r = self - other * q;
-                if r >= other {
-                    q += Self::ONE;
-                    r -= other;
-                }
-                (q, r)
+                self.div_mod(other)
             }
 
-            /// See https://github.com/chfast/intx/blob/2f62de735fe688e9645af8904099f0571f8f0d9c/include/intx/intx.hpp#L789
             fn div_s(self, other: Self) -> (Self, Self) {
                 let x = self;
                 let y = other;
@@ -1386,43 +1701,193 @@ macro_rules! construct_eint_twin {
     };
 }
 
+#[macro_export]
 macro_rules! uint_twin_from_impl {
-    ($name:ident, $half:ty, $from:ty) => {
+    ($name:ident, $from:ty) => {
         impl core::convert::From<$from> for $name {
             fn from(small: $from) -> Self {
-                Self(<$half>::from(small), <$half>::MIN_U)
+                let mut b = [0u64; Self::BITS as usize >> 6];
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        &small as *const $from as *const u8,
+                        b.as_mut_ptr() as *mut u8,
+                        <$from>::BITS as usize >> 3,
+                    );
+                }
+                Self(b)
             }
         }
     };
 }
 
-construct_eint_twin!(E256, E128);
-construct_eint_twin!(E512, E256);
-construct_eint_twin!(E1024, E512);
-construct_eint_twin!(E2048, E1024);
-uint_twin_from_impl!(E256, E128, E8);
-uint_twin_from_impl!(E256, E128, E16);
-uint_twin_from_impl!(E256, E128, E32);
-uint_twin_from_impl!(E256, E128, E64);
-uint_twin_from_impl!(E256, E128, E128);
-uint_twin_from_impl!(E512, E256, E8);
-uint_twin_from_impl!(E512, E256, E16);
-uint_twin_from_impl!(E512, E256, E32);
-uint_twin_from_impl!(E512, E256, E64);
-uint_twin_from_impl!(E512, E256, E128);
-uint_twin_from_impl!(E512, E256, E256);
-uint_twin_from_impl!(E1024, E512, E8);
-uint_twin_from_impl!(E1024, E512, E16);
-uint_twin_from_impl!(E1024, E512, E32);
-uint_twin_from_impl!(E1024, E512, E64);
-uint_twin_from_impl!(E1024, E512, E128);
-uint_twin_from_impl!(E1024, E512, E256);
-uint_twin_from_impl!(E1024, E512, E512);
-uint_twin_from_impl!(E2048, E1024, E8);
-uint_twin_from_impl!(E2048, E1024, E16);
-uint_twin_from_impl!(E2048, E1024, E32);
-uint_twin_from_impl!(E2048, E1024, E64);
-uint_twin_from_impl!(E2048, E1024, E128);
-uint_twin_from_impl!(E2048, E1024, E256);
-uint_twin_from_impl!(E2048, E1024, E512);
-uint_twin_from_impl!(E2048, E1024, E1024);
+construct_eint_twin!(E256, 4);
+construct_eint_twin!(E512, 8);
+construct_eint_twin!(E1024, 16);
+construct_eint_twin!(E2048, 32);
+impl_widening_mul_u_twin!(E256, 4);
+impl_widening_mul_u_twin!(E512, 8);
+impl_widening_mul_u_twin!(E1024, 16);
+impl_widening_mul_u_twin!(E2048, 32);
+uint_twin_from_impl!(E256, E8);
+uint_twin_from_impl!(E256, E16);
+uint_twin_from_impl!(E256, E32);
+uint_twin_from_impl!(E256, E64);
+uint_twin_from_impl!(E256, E128);
+uint_twin_from_impl!(E512, E8);
+uint_twin_from_impl!(E512, E16);
+uint_twin_from_impl!(E512, E32);
+uint_twin_from_impl!(E512, E64);
+uint_twin_from_impl!(E512, E128);
+uint_twin_from_impl!(E512, E256);
+uint_twin_from_impl!(E1024, E8);
+uint_twin_from_impl!(E1024, E16);
+uint_twin_from_impl!(E1024, E32);
+uint_twin_from_impl!(E1024, E64);
+uint_twin_from_impl!(E1024, E128);
+uint_twin_from_impl!(E1024, E256);
+uint_twin_from_impl!(E1024, E512);
+uint_twin_from_impl!(E2048, E8);
+uint_twin_from_impl!(E2048, E16);
+uint_twin_from_impl!(E2048, E32);
+uint_twin_from_impl!(E2048, E64);
+uint_twin_from_impl!(E2048, E128);
+uint_twin_from_impl!(E2048, E256);
+uint_twin_from_impl!(E2048, E512);
+uint_twin_from_impl!(E2048, E1024);
+
+pub mod ll {
+    #[link(name = "eint-c-impl", kind = "static")]
+    extern "C" {
+        pub fn c_widening_mul_u(w: *mut u64, x: *const u64, y: *const u64, digits_count: usize);
+        pub fn c_widening_mul_u_128_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
+        pub fn c_widening_mul_u_256_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
+        pub fn c_widening_mul_u_512_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
+        pub fn c_widening_mul_u_1024_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
+
+        pub fn c_wrapping_mul(w: *mut u64, x: *const u64, y: *const u64, digits_count: usize);
+        pub fn c_wrapping_mul_128_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
+        pub fn c_wrapping_mul_256_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
+        pub fn c_wrapping_mul_512_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
+        pub fn c_wrapping_mul_1024_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
+
+        pub fn c_overflowing_add(w: *mut u64, x: *const u64, y: *const u64, digits_count: usize) -> u64;
+        pub fn c_overflowing_sub(w: *mut u64, x: *const u64, y: *const u64, digits_count: usize) -> u64;
+    }
+
+    pub fn widening_mul_u(w: &mut [u8], x: &[u8], y: &[u8]) {
+        let digits_count = x.len() >> 3;
+        unsafe {
+            c_widening_mul_u(
+                w.as_mut_ptr() as *mut u64,
+                x.as_ptr() as *const u64,
+                y.as_ptr() as *const u64,
+                digits_count,
+            );
+        }
+    }
+
+    pub fn widening_mul_u_128(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
+        unsafe {
+            c_widening_mul_u_128_batch(
+                w.as_ptr() as *mut u64,
+                x.as_ptr() as *const u64,
+                y.as_ptr() as *const u64,
+                batch,
+            );
+        }
+    }
+
+    pub fn widening_mul_u_256(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
+        unsafe {
+            c_widening_mul_u_256_batch(
+                w.as_ptr() as *mut u64,
+                x.as_ptr() as *const u64,
+                y.as_ptr() as *const u64,
+                batch,
+            );
+        }
+    }
+
+    pub fn widening_mul_u_512(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
+        unsafe {
+            c_widening_mul_u_512_batch(
+                w.as_ptr() as *mut u64,
+                x.as_ptr() as *const u64,
+                y.as_ptr() as *const u64,
+                batch,
+            );
+        }
+    }
+
+    pub fn widening_mul_u_1024(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
+        unsafe {
+            c_widening_mul_u_1024_batch(
+                w.as_ptr() as *mut u64,
+                x.as_ptr() as *const u64,
+                y.as_ptr() as *const u64,
+                batch,
+            );
+        }
+    }
+
+    pub fn wrapping_mul_128(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
+        unsafe {
+            c_wrapping_mul_128_batch(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, batch);
+        }
+    }
+
+    pub fn wrapping_mul_256(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
+        unsafe {
+            c_wrapping_mul_256_batch(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, batch);
+        }
+    }
+
+    pub fn wrapping_mul_512(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
+        unsafe {
+            c_wrapping_mul_512_batch(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, batch);
+        }
+    }
+
+    pub fn wrapping_mul_1024(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
+        unsafe {
+            c_wrapping_mul_1024_batch(
+                w.as_ptr() as *mut u64,
+                x.as_ptr() as *const u64,
+                y.as_ptr() as *const u64,
+                batch,
+            );
+        }
+    }
+
+    pub fn overflowing_add_128(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
+        unsafe { c_overflowing_add(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 2) }
+    }
+
+    pub fn overflowing_add_256(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
+        unsafe { c_overflowing_add(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 4) }
+    }
+
+    pub fn overflowing_add_512(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
+        unsafe { c_overflowing_add(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 8) }
+    }
+
+    pub fn overflowing_add_1024(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
+        unsafe { c_overflowing_add(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 16) }
+    }
+
+    pub fn overflowing_sub_128(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
+        unsafe { c_overflowing_sub(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 2) }
+    }
+
+    pub fn overflowing_sub_256(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
+        unsafe { c_overflowing_sub(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 4) }
+    }
+
+    pub fn overflowing_sub_512(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
+        unsafe { c_overflowing_sub(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 8) }
+    }
+
+    pub fn overflowing_sub_1024(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
+        unsafe { c_overflowing_sub(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 16) }
+    }
+}
