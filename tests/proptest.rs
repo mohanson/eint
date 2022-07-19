@@ -301,6 +301,47 @@ proptest! {
     }
 
     #[test]
+    fn test_widdening_mul_256(x0 in 0..=u128::MAX, x1 in 0..=u128::MAX, y0 in 0..=u128::MAX, y1 in 0..=u128::MAX) {
+        let x = E256(E128(x0), E128(x1));
+        let y = E256(E128(y0), E128(y1));
+        let (r0, r1) = Eint::widening_mul_u(x, y);
+        let mut r = [0u8; 64];
+        r0.put(&mut r[0..32]);
+        r1.put(&mut r[32..64]);
+
+        let mut xx = [0u8; 32];
+        let mut yy = [0u8; 32];
+        let mut rr = [0u8; 64];
+        (&mut xx[0..16]).copy_from_slice(&x0.to_le_bytes());
+        (&mut xx[16..32]).copy_from_slice(&x1.to_le_bytes());
+        (&mut yy[0..16]).copy_from_slice(&y0.to_le_bytes());
+        (&mut yy[16..32]).copy_from_slice(&y1.to_le_bytes());
+        c_impl::widening_mul_256(&mut rr, &xx, &yy, 1);
+
+        assert_eq!(r, rr);
+    }
+    #[test]
+    fn test_mul_256(x0 in 0..=u128::MAX, x1 in 0..=u128::MAX, y0 in 0..=u128::MAX, y1 in 0..=u128::MAX) {
+        let x = E256(E128(x0), E128(x1));
+        let y = E256(E128(y0), E128(y1));
+        let r0 = Eint::wrapping_mul(x, y);
+        let mut r = [0u8; 32];
+        r0.put(&mut r[0..32]);
+
+        let mut xx = [0u8; 32];
+        let mut yy = [0u8; 32];
+        let mut rr = [0u8; 32];
+        (&mut xx[0..16]).copy_from_slice(&x0.to_le_bytes());
+        (&mut xx[16..32]).copy_from_slice(&x1.to_le_bytes());
+        (&mut yy[0..16]).copy_from_slice(&y0.to_le_bytes());
+        (&mut yy[16..32]).copy_from_slice(&y1.to_le_bytes());
+        c_impl::mul_256(&mut rr, &xx, &yy, 1);
+
+        assert_eq!(r, rr);
+    }
+
+
+    #[test]
     fn test_widdening_sub_s(x in 0..=u64::MAX, y in 0..=u64::MAX) {
         let r0 = Eint::widening_sub_s(E64::from(x), E64::from(y));
         let r1 = Eint::widening_sub_s(T64::recv(x), T64::recv(y));
