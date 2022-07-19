@@ -1,9 +1,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define MIN(x, y) (((x) < (y)) ? (x) : (y))
-#define MAX(x, y) (((x) > (y)) ? (x) : (y))
-
 typedef __uint128_t uint128_t;
 
 // HAC, 14.12 Algorithm Multiple-precision multiplication
@@ -42,8 +39,6 @@ void eint_mul(uint64_t *w, uint64_t *x, uint64_t *y, size_t digits_count) {
     }
   }
 }
-
-// TODO: mulh
 
 // we should specify digits_count in C code to enable optimization from
 // compiler. so don't export function eint_widening_mul to Rust code directly.
@@ -122,4 +117,3 @@ void eint_mul_128_batch(uint64_t *w, uint64_t *x, uint64_t *y, size_t batch) {
     y += 2;
   }
 }
-

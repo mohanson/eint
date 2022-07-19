@@ -152,6 +152,5 @@ criterion_group!(
     e256_wrapping_div_u,
     e256_wrapping_rem_s,
     e256_wrapping_rem_u,
-    e256_wrapping_mul,
 );
 criterion_main!(benches);
