@@ -4,13 +4,13 @@ Extended precision integer Rust library. Provides signed/unsigned integer 256 to
 
 ```text
 [dependencies]
-eint = "0.1.2"
+eint = "0.1"
 ```
 
 # Usage
 
 ```rs
-use eint::E256;
+use eint::{E256, Eint};
 
 fn main() {
     let a = E256::from(u128::MAX);
@@ -21,13 +21,24 @@ fn main() {
     println!("a - b = {:?}", a - b);
     println!("a * b = {:?}", a * b);
     println!("a / b = {:?}", a / b);
+    println!("a.ctz = {:?}", a.ctz());
 }
 ```
+
+Full docs: [https://docs.rs/eint/latest/eint/](https://docs.rs/eint/latest/eint/)
 
 # Test
 
 ```sh
+# Test
 $ cargo test
+
+# Fuzzing
+$ cargo +nightly fuzz run arith_e64
+$ cargo +nightly fuzz run arith_e256
+
+# Bench
+$ cargo bench
 ```
 
 # Maintainer

@@ -4,8 +4,12 @@
 //!
 //! ```text
 //! [dependencies]
-//! eint = "0.1.2"
+//! eint = "0.1"
 //! ```
+
+#![no_std]
+extern crate alloc;
+use alloc::{format, string::String};
 
 pub trait Eint:
     Clone
@@ -25,31 +29,31 @@ pub trait Eint:
     + From<u128>
     + From<Self>
     + PartialEq
-    + std::cmp::Ord
-    + std::cmp::PartialOrd
-    + std::fmt::Debug
-    + std::fmt::Display
-    + std::fmt::LowerHex
-    + std::ops::Add<Output = Self>
-    + std::ops::AddAssign
-    + std::ops::BitAnd<Output = Self>
-    + std::ops::BitAndAssign
-    + std::ops::BitOr<Output = Self>
-    + std::ops::BitOrAssign
-    + std::ops::BitXor<Output = Self>
-    + std::ops::BitXorAssign
-    + std::ops::Div<Output = Self>
-    + std::ops::DivAssign
-    + std::ops::Mul<Output = Self>
-    + std::ops::MulAssign
-    + std::ops::Neg<Output = Self>
-    + std::ops::Not
-    + std::ops::Rem<Output = Self>
-    + std::ops::RemAssign
-    + std::ops::Sub<Output = Self>
-    + std::ops::SubAssign
-    + std::ops::Shl<u32, Output = Self>
-    + std::ops::Shr<u32, Output = Self>
+    + core::cmp::Ord
+    + core::cmp::PartialOrd
+    + core::fmt::Debug
+    + core::fmt::Display
+    + core::fmt::LowerHex
+    + core::ops::Add<Output = Self>
+    + core::ops::AddAssign
+    + core::ops::BitAnd<Output = Self>
+    + core::ops::BitAndAssign
+    + core::ops::BitOr<Output = Self>
+    + core::ops::BitOrAssign
+    + core::ops::BitXor<Output = Self>
+    + core::ops::BitXorAssign
+    + core::ops::Div<Output = Self>
+    + core::ops::DivAssign
+    + core::ops::Mul<Output = Self>
+    + core::ops::MulAssign
+    + core::ops::Neg<Output = Self>
+    + core::ops::Not
+    + core::ops::Rem<Output = Self>
+    + core::ops::RemAssign
+    + core::ops::Sub<Output = Self>
+    + core::ops::SubAssign
+    + core::ops::Shl<u32, Output = Self>
+    + core::ops::Shr<u32, Output = Self>
 {
     const BITS: u32;
     const MAX_S: Self;
@@ -59,7 +63,7 @@ pub trait Eint:
     const ONE: Self;
     const ZERO: Self;
 
-    /// Returns (self + rhs) >> 1.
+    /// Returns (self + rhs) >> 1. Signed.
     fn average_add_s(self, other: Self) -> Self {
         (self & other).wrapping_add((self ^ other).wrapping_sra(1))
     }
@@ -69,7 +73,7 @@ pub trait Eint:
         (self & other).wrapping_add((self ^ other).wrapping_shr(1))
     }
 
-    /// Returns (self - rhs) >> 1.
+    /// Returns (self - rhs) >> 1. Signed.
     fn average_sub_s(self, other: Self) -> Self {
         let (lo, borrow) = self.overflowing_sub_u(other);
         let hi_0 = if !self.is_negative() { Self::MIN_U } else { Self::MAX_U };
@@ -88,14 +92,23 @@ pub trait Eint:
         }
     }
 
+    /// Get bit.
+    fn bit(&self, n: u32) -> bool;
+
+    /// Clear bit.
+    fn bit_clr(&mut self, n: u32);
+
+    /// Set bit.
+    fn bit_set(&mut self, n: u32);
+
     /// Returns the number of leading zeros in the binary representation of self.
     fn clz(self) -> u32;
 
-    /// Compare signed.
-    fn cmp_s(&self, other: &Self) -> std::cmp::Ordering;
+    /// Compare. Signed.
+    fn cmp_s(&self, other: &Self) -> core::cmp::Ordering;
 
     /// Compare.
-    fn cmp_u(&self, other: &Self) -> std::cmp::Ordering;
+    fn cmp_u(&self, other: &Self) -> core::cmp::Ordering;
 
     /// Returns the number of ones in the binary representation of self.
     fn cpop(self) -> u32;
@@ -104,7 +117,9 @@ pub trait Eint:
     fn ctz(self) -> u32;
 
     /// Get a native endian integer value from its representation as a byte slice in little endian.
-    fn get(mem: &[u8]) -> Self;
+    fn get(mem: &[u8]) -> Self {
+        unsafe { core::ptr::read(mem.as_ptr() as *const _) }
+    }
 
     /// Returns the higher part.
     fn hi(self) -> Self;
@@ -121,19 +136,19 @@ pub trait Eint:
     /// Returns the lower part and sign extend it.
     fn lo_sext(self) -> Self;
 
-    /// Calculates self + rhs.
+    /// Calculates self + rhs. Signed.
     fn overflowing_add_s(self, other: Self) -> (Self, bool);
 
     /// Calculates self + rhs.
     fn overflowing_add_u(self, other: Self) -> (Self, bool);
 
-    /// Calculates self * rhs.
+    /// Calculates self * rhs. Signed.
     fn overflowing_mul_s(self, other: Self) -> (Self, bool);
 
     /// Calculates self * rhs.
     fn overflowing_mul_u(self, other: Self) -> (Self, bool);
 
-    /// Calculates self - rhs.
+    /// Calculates self - rhs. Signed.
     fn overflowing_sub_s(self, other: Self) -> (Self, bool);
 
     /// Calculates self - rhs.
@@ -145,7 +160,7 @@ pub trait Eint:
     /// Put the lower part integer as a byte array in little-endian byte order to memory.
     fn put_lo(&self, mem: &mut [u8]);
 
-    /// Saturating integer addition. Computes self + rhs, saturating at the numeric bounds instead of overflowing.
+    /// Saturating integer addition. Computes self + rhs, saturating at the numeric bounds instead of overflowing. Signed.
     fn saturating_add_s(self, other: Self) -> (Self, bool) {
         let r = self.wrapping_add(other);
         if !(self ^ other).is_negative() {
@@ -167,7 +182,7 @@ pub trait Eint:
         }
     }
 
-    /// Saturating integer subtraction. Computes self - rhs, saturating at the numeric bounds instead of overflowing.
+    /// Saturating integer subtraction. Computes self - rhs, saturating at the numeric bounds instead of overflowing. Signed.
     fn saturating_sub_s(self, other: Self) -> (Self, bool) {
         let r = self.wrapping_sub(other);
         if (self ^ other).is_negative() {
@@ -205,7 +220,8 @@ pub trait Eint:
     /// Returns the lower 64 bits.
     fn u64(self) -> u64;
 
-    /// Signed widening add.
+    /// Widening add. Signed.
+    /// (lo, hi) = x + y with the product bits' upper half returned in hi and the lower half returned in lo.
     fn widening_add_s(self, other: Self) -> (Self, Self) {
         let hi_0 = if self.is_negative() { Self::MAX_U } else { Self::MIN_U };
         let hi_1 = if other.is_negative() { Self::MAX_U } else { Self::MIN_U };
@@ -215,13 +231,15 @@ pub trait Eint:
     }
 
     /// Widening add.
+    /// (lo, hi) = x + y with the product bits' upper half returned in hi and the lower half returned in lo.
     fn widening_add_u(self, other: Self) -> (Self, Self) {
         let (lo, carry) = self.overflowing_add_u(other);
         (lo, Self::from(carry))
     }
 
-    /// Signed interger widening multiple.
+    /// Widening multiple. Signed.
     ///
+    /// (lo, hi) = x * y with the product bits' upper half returned in hi and the lower half returned in lo.
     /// Inspired by https://sqlite.in/?qa=668884/c-32-bit-signed-integer-multiplication-without-using-64-bit-data-type
     fn widening_mul_s(self, other: Self) -> (Self, Self) {
         let (lo, hi) = self.widening_mul_u(other);
@@ -232,6 +250,7 @@ pub trait Eint:
     }
 
     /// Widening signed and unsigned integer multiply.
+    /// (lo, hi) = x * y with the product bits' upper half returned in hi and the lower half returned in lo.
     fn widening_mul_su(self, other: Self) -> (Self, Self) {
         if !other.is_negative() {
             self.widening_mul_s(other)
@@ -242,8 +261,8 @@ pub trait Eint:
         }
     }
 
-    /// Function widening_mul returns the product of x and y: (lo, hi) = x * y
-    /// with the product bits' upper half returned in hi and the lower half returned in lo.
+    /// Widening multiple.
+    /// (lo, hi) = x * y with the product bits' upper half returned in hi and the lower half returned in lo.
     ///
     /// See https://pkg.go.dev/math/bits@go1.17.2#Mul64
     fn widening_mul_u(self, other: Self) -> (Self, Self) {
@@ -261,7 +280,8 @@ pub trait Eint:
         (lo, hi)
     }
 
-    /// Signed widening substract.
+    /// Widening substract. Signed.
+    /// (lo, hi) = x - y with the product bits' upper half returned in hi and the lower half returned in lo.
     fn widening_sub_s(self, other: Self) -> (Self, Self) {
         let hi_0 = if self.is_negative() { Self::MAX_U } else { Self::MIN_U };
         let hi_1 = if other.is_negative() { Self::MAX_U } else { Self::MIN_U };
@@ -271,6 +291,7 @@ pub trait Eint:
     }
 
     /// Widening substract.
+    /// (lo, hi) = x - y with the product bits' upper half returned in hi and the lower half returned in lo.
     fn widening_sub_u(self, other: Self) -> (Self, Self) {
         let (lo, borrow) = self.overflowing_sub_u(other);
         (lo, if borrow { Self::MAX_U } else { Self::MIN_U })
@@ -283,7 +304,7 @@ pub trait Eint:
     /// 1) x / 0 = MAX_U
     fn wrapping_div_u(self, other: Self) -> Self;
 
-    /// Wrapping (modular) division signed.
+    /// Wrapping (modular) division. Signed.
     /// 1) x / 0 = -1.
     /// 2) MIN_S / -1 = MIN_S
     fn wrapping_div_s(self, other: Self) -> Self;
@@ -291,7 +312,7 @@ pub trait Eint:
     /// Wrapping (modular) multiplication. Computes self * rhs, wrapping around at the boundary of the type.
     fn wrapping_mul(self, other: Self) -> Self;
 
-    /// Wrapping (modular) remainder signed.
+    /// Wrapping (modular) remainder. Signed.
     /// 1) x % 0 = x
     /// 2) MIN_S % -1 = 0
     fn wrapping_rem_s(self, other: Self) -> Self;
@@ -323,7 +344,7 @@ pub trait Eint:
 #[macro_export]
 macro_rules! construct_eint_wrap_from_uint {
     ($name:ident, $uint:ty, $from:ty) => {
-        impl std::convert::From<$from> for $name {
+        impl core::convert::From<$from> for $name {
             fn from(small: $from) -> Self {
                 Self(small as $uint)
             }
@@ -349,20 +370,20 @@ macro_rules! construct_eint_wrap {
         construct_eint_wrap_from_uint!($name, $uint, u64);
         construct_eint_wrap_from_uint!($name, $uint, u128);
 
-        impl std::cmp::Ord for $name {
-            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        impl core::cmp::Ord for $name {
+            fn cmp(&self, other: &Self) -> core::cmp::Ordering {
                 self.0.cmp(&other.0)
             }
         }
 
-        impl std::cmp::PartialOrd for $name {
-            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        impl core::cmp::PartialOrd for $name {
+            fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
                 return self.0.partial_cmp(&other.0);
             }
         }
 
-        impl std::fmt::Debug for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        impl core::fmt::Debug for $name {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let suffix = format!("{:x}", self.0);
                 let prefix = String::from("0").repeat(Self::BITS as usize / 4 - suffix.len());
                 write!(f, "{}", prefix)?;
@@ -370,8 +391,8 @@ macro_rules! construct_eint_wrap {
             }
         }
 
-        impl std::fmt::Display for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        impl core::fmt::Display for $name {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let suffix = format!("{:x}", self.0);
                 let prefix = String::from("0").repeat(Self::BITS as usize / 4 - suffix.len());
                 write!(f, "{}", prefix)?;
@@ -379,8 +400,8 @@ macro_rules! construct_eint_wrap {
             }
         }
 
-        impl std::fmt::LowerHex for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        impl core::fmt::LowerHex for $name {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 let suffix = format!("{:x}", self.0);
                 let prefix = String::from("0").repeat(Self::BITS as usize / 4 - suffix.len());
                 write!(f, "{}", prefix)?;
@@ -388,20 +409,20 @@ macro_rules! construct_eint_wrap {
             }
         }
 
-        impl std::ops::Add for $name {
+        impl core::ops::Add for $name {
             type Output = Self;
             fn add(self, other: Self) -> Self {
                 Self(self.0.wrapping_add(other.0))
             }
         }
 
-        impl std::ops::AddAssign for $name {
+        impl core::ops::AddAssign for $name {
             fn add_assign(&mut self, other: Self) {
                 self.0 = self.0.wrapping_add(other.0)
             }
         }
 
-        impl std::ops::Div for $name {
+        impl core::ops::Div for $name {
             type Output = Self;
             fn div(self, other: Self) -> Self::Output {
                 if other.0 == 0 {
@@ -412,7 +433,7 @@ macro_rules! construct_eint_wrap {
             }
         }
 
-        impl std::ops::DivAssign for $name {
+        impl core::ops::DivAssign for $name {
             fn div_assign(&mut self, other: Self) {
                 self.0 = if other.0 == 0 {
                     <$uint>::MAX
@@ -422,73 +443,73 @@ macro_rules! construct_eint_wrap {
             }
         }
 
-        impl std::ops::BitAnd for $name {
+        impl core::ops::BitAnd for $name {
             type Output = Self;
             fn bitand(self, other: Self) -> Self::Output {
                 Self(self.0 & other.0)
             }
         }
 
-        impl std::ops::BitAndAssign for $name {
+        impl core::ops::BitAndAssign for $name {
             fn bitand_assign(&mut self, other: Self) {
                 self.0 &= other.0
             }
         }
 
-        impl std::ops::BitOr for $name {
+        impl core::ops::BitOr for $name {
             type Output = Self;
             fn bitor(self, other: Self) -> Self::Output {
                 Self(self.0 | other.0)
             }
         }
 
-        impl std::ops::BitOrAssign for $name {
+        impl core::ops::BitOrAssign for $name {
             fn bitor_assign(&mut self, other: Self) {
                 self.0 |= other.0
             }
         }
 
-        impl std::ops::BitXor for $name {
+        impl core::ops::BitXor for $name {
             type Output = Self;
             fn bitxor(self, other: Self) -> Self::Output {
                 Self(self.0 ^ other.0)
             }
         }
 
-        impl std::ops::BitXorAssign for $name {
+        impl core::ops::BitXorAssign for $name {
             fn bitxor_assign(&mut self, other: Self) {
                 self.0 ^= other.0
             }
         }
 
-        impl std::ops::Mul for $name {
+        impl core::ops::Mul for $name {
             type Output = Self;
             fn mul(self, other: Self) -> Self::Output {
                 Self(self.0.wrapping_mul(other.0))
             }
         }
 
-        impl std::ops::MulAssign for $name {
+        impl core::ops::MulAssign for $name {
             fn mul_assign(&mut self, other: Self) {
                 self.0 = self.0.wrapping_mul(other.0)
             }
         }
 
-        impl std::ops::Neg for $name {
+        impl core::ops::Neg for $name {
             type Output = Self;
             fn neg(self) -> Self::Output {
                 Self((!self.0).wrapping_add(1))
             }
         }
 
-        impl std::ops::Not for $name {
+        impl core::ops::Not for $name {
             type Output = Self;
             fn not(self) -> Self::Output {
                 Self(!self.0)
             }
         }
 
-        impl std::ops::Rem for $name {
+        impl core::ops::Rem for $name {
             type Output = Self;
             fn rem(self, other: Self) -> Self::Output {
                 if other.0 == 0 {
@@ -499,7 +520,7 @@ macro_rules! construct_eint_wrap {
             }
         }
 
-        impl std::ops::RemAssign for $name {
+        impl core::ops::RemAssign for $name {
             fn rem_assign(&mut self, other: Self) {
                 self.0 = if other.0 == 0 {
                     self.0
@@ -509,28 +530,28 @@ macro_rules! construct_eint_wrap {
             }
         }
 
-        impl std::ops::Shl<u32> for $name {
+        impl core::ops::Shl<u32> for $name {
             type Output = Self;
             fn shl(self, other: u32) -> Self::Output {
                 Self(self.0.wrapping_shl(other))
             }
         }
 
-        impl std::ops::Shr<u32> for $name {
+        impl core::ops::Shr<u32> for $name {
             type Output = Self;
             fn shr(self, other: u32) -> Self::Output {
                 Self(self.0.wrapping_shr(other))
             }
         }
 
-        impl std::ops::Sub for $name {
+        impl core::ops::Sub for $name {
             type Output = Self;
             fn sub(self, other: Self) -> Self::Output {
                 Self(self.0.wrapping_sub(other.0))
             }
         }
 
-        impl std::ops::SubAssign for $name {
+        impl core::ops::SubAssign for $name {
             fn sub_assign(&mut self, other: Self) {
                 self.0 = self.0.wrapping_sub(other.0)
             }
@@ -545,15 +566,27 @@ macro_rules! construct_eint_wrap {
             const ONE: Self = Self(1);
             const ZERO: Self = Self(0);
 
+            fn bit(&self, n: u32) -> bool {
+                self.0.wrapping_shr(n) & 1 != 0
+            }
+
+            fn bit_clr(&mut self, n: u32) {
+                self.0 &= !<$name>::ONE.0.wrapping_shl(n)
+            }
+
+            fn bit_set(&mut self, n: u32) {
+                self.0 |= <$name>::ONE.0.wrapping_shl(n)
+            }
+
             fn clz(self) -> u32 {
                 self.0.leading_zeros()
             }
 
-            fn cmp_s(&self, other: &Self) -> std::cmp::Ordering {
+            fn cmp_s(&self, other: &Self) -> core::cmp::Ordering {
                 (self.0 as $sint).cmp(&(other.0 as $sint))
             }
 
-            fn cmp_u(&self, other: &Self) -> std::cmp::Ordering {
+            fn cmp_u(&self, other: &Self) -> core::cmp::Ordering {
                 self.0.cmp(&other.0)
             }
 
@@ -743,7 +776,7 @@ uint_wrap_from_impl!(E128, E64);
 #[macro_export]
 macro_rules! construct_eint_twin_from_uint {
     ($name:ident, $half:ty, $from:ty) => {
-        impl std::convert::From<$from> for $name {
+        impl core::convert::From<$from> for $name {
             fn from(small: $from) -> Self {
                 Self(<$half>::from(small), <$half>::MIN_U)
             }
@@ -754,7 +787,7 @@ macro_rules! construct_eint_twin_from_uint {
 #[macro_export]
 macro_rules! construct_eint_twin_from_sint {
     ($name:ident, $half:ty, $from:ty) => {
-        impl std::convert::From<$from> for $name {
+        impl core::convert::From<$from> for $name {
             fn from(small: $from) -> Self {
                 let lo = <$half>::from(small);
                 let hi = if small >= 0 {
@@ -786,166 +819,166 @@ macro_rules! construct_eint_twin {
         construct_eint_twin_from_uint!($name, $half, u64);
         construct_eint_twin_from_uint!($name, $half, u128);
 
-        impl std::cmp::PartialOrd for $name {
-            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        impl core::cmp::PartialOrd for $name {
+            fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
                 Some(self.cmp(other))
             }
         }
 
-        impl std::cmp::Ord for $name {
-            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        impl core::cmp::Ord for $name {
+            fn cmp(&self, other: &Self) -> core::cmp::Ordering {
                 self.cmp_u(other)
             }
         }
 
-        impl std::fmt::Debug for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        impl core::fmt::Debug for $name {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 write!(f, "{:x}{:x}", self.1, self.0)
             }
         }
 
-        impl std::fmt::Display for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        impl core::fmt::Display for $name {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 write!(f, "{:x}{:x}", self.1, self.0)
             }
         }
 
-        impl std::fmt::LowerHex for $name {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        impl core::fmt::LowerHex for $name {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 write!(f, "{:x}{:x}", self.1, self.0)
             }
         }
 
-        impl std::ops::Add for $name {
+        impl core::ops::Add for $name {
             type Output = Self;
             fn add(self, other: Self) -> Self {
                 self.wrapping_add(other)
             }
         }
 
-        impl std::ops::AddAssign for $name {
+        impl core::ops::AddAssign for $name {
             fn add_assign(&mut self, other: Self) {
                 *self = self.wrapping_add(other)
             }
         }
 
-        impl std::ops::BitAnd for $name {
+        impl core::ops::BitAnd for $name {
             type Output = Self;
             fn bitand(self, other: Self) -> Self::Output {
                 Self(self.0 & other.0, self.1 & other.1)
             }
         }
 
-        impl std::ops::BitAndAssign for $name {
+        impl core::ops::BitAndAssign for $name {
             fn bitand_assign(&mut self, other: Self) {
                 self.0 &= other.0;
                 self.1 &= other.1;
             }
         }
 
-        impl std::ops::BitOr for $name {
+        impl core::ops::BitOr for $name {
             type Output = Self;
             fn bitor(self, other: Self) -> Self::Output {
                 Self(self.0 | other.0, self.1 | other.1)
             }
         }
 
-        impl std::ops::BitOrAssign for $name {
+        impl core::ops::BitOrAssign for $name {
             fn bitor_assign(&mut self, other: Self) {
                 self.0 |= other.0;
                 self.1 |= other.1;
             }
         }
 
-        impl std::ops::BitXor for $name {
+        impl core::ops::BitXor for $name {
             type Output = Self;
             fn bitxor(self, other: Self) -> Self::Output {
                 Self(self.0 ^ other.0, self.1 ^ other.1)
             }
         }
 
-        impl std::ops::BitXorAssign for $name {
+        impl core::ops::BitXorAssign for $name {
             fn bitxor_assign(&mut self, other: Self) {
                 self.0 ^= other.0;
                 self.1 ^= other.1;
             }
         }
 
-        impl std::ops::Div for $name {
+        impl core::ops::Div for $name {
             type Output = Self;
             fn div(self, other: Self) -> Self::Output {
                 self.wrapping_div_u(other)
             }
         }
 
-        impl std::ops::DivAssign for $name {
+        impl core::ops::DivAssign for $name {
             fn div_assign(&mut self, other: Self) {
                 *self = self.wrapping_div_u(other)
             }
         }
 
-        impl std::ops::Mul for $name {
+        impl core::ops::Mul for $name {
             type Output = Self;
             fn mul(self, other: Self) -> Self::Output {
                 self.wrapping_mul(other)
             }
         }
 
-        impl std::ops::MulAssign for $name {
+        impl core::ops::MulAssign for $name {
             fn mul_assign(&mut self, other: Self) {
                 *self = self.wrapping_mul(other)
             }
         }
 
-        impl std::ops::Neg for $name {
+        impl core::ops::Neg for $name {
             type Output = Self;
             fn neg(self) -> Self::Output {
                 (!self).wrapping_add(<$name>::ONE)
             }
         }
 
-        impl std::ops::Not for $name {
+        impl core::ops::Not for $name {
             type Output = Self;
             fn not(self) -> Self::Output {
                 Self(!self.0, !self.1)
             }
         }
 
-        impl std::ops::Rem for $name {
+        impl core::ops::Rem for $name {
             type Output = Self;
             fn rem(self, other: Self) -> Self::Output {
                 self.wrapping_rem_u(other)
             }
         }
 
-        impl std::ops::RemAssign for $name {
+        impl core::ops::RemAssign for $name {
             fn rem_assign(&mut self, other: Self) {
                 *self = self.wrapping_rem_u(other);
             }
         }
 
-        impl std::ops::Shl<u32> for $name {
+        impl core::ops::Shl<u32> for $name {
             type Output = Self;
             fn shl(self, other: u32) -> Self::Output {
                 self.wrapping_shl(other)
             }
         }
 
-        impl std::ops::Shr<u32> for $name {
+        impl core::ops::Shr<u32> for $name {
             type Output = Self;
             fn shr(self, other: u32) -> Self::Output {
                 self.wrapping_shr(other)
             }
         }
 
-        impl std::ops::Sub for $name {
+        impl core::ops::Sub for $name {
             type Output = Self;
             fn sub(self, other: Self) -> Self::Output {
                 self.wrapping_sub(other)
             }
         }
 
-        impl std::ops::SubAssign for $name {
+        impl core::ops::SubAssign for $name {
             fn sub_assign(&mut self, other: Self) {
                 *self = self.wrapping_sub(other)
             }
@@ -960,6 +993,33 @@ macro_rules! construct_eint_twin {
             const ONE: Self = Self(<$half>::ONE, <$half>::MIN_U);
             const ZERO: Self = Self(<$half>::MIN_U, <$half>::MIN_U);
 
+            fn bit(&self, n: u32) -> bool {
+                let n = n & (<$name>::BITS - 1);
+                if n < <$half>::BITS {
+                    self.0.bit(n)
+                } else {
+                    self.1.bit(n - <$half>::BITS)
+                }
+            }
+
+            fn bit_clr(&mut self, n: u32) {
+                let n = n & (<$name>::BITS - 1);
+                if n < <$half>::BITS {
+                    self.0.bit_clr(n)
+                } else {
+                    self.1.bit_clr(n - <$half>::BITS)
+                }
+            }
+
+            fn bit_set(&mut self, n: u32) {
+                let n = n & (<$name>::BITS - 1);
+                if n < <$half>::BITS {
+                    self.0.bit_set(n)
+                } else {
+                    self.1.bit_set(n - <$half>::BITS)
+                }
+            }
+
             fn clz(self) -> u32 {
                 if self.1 == <$half>::MIN_U {
                     Self::BITS / 2 + self.0.clz()
@@ -968,20 +1028,20 @@ macro_rules! construct_eint_twin {
                 }
             }
 
-            fn cmp_s(&self, other: &Self) -> std::cmp::Ordering {
+            fn cmp_s(&self, other: &Self) -> core::cmp::Ordering {
                 let l_sign = self.is_negative();
                 let r_sign = other.is_negative();
                 match (l_sign, r_sign) {
                     (false, false) => self.cmp(&other),
-                    (false, true) => std::cmp::Ordering::Greater,
-                    (true, false) => std::cmp::Ordering::Less,
+                    (false, true) => core::cmp::Ordering::Greater,
+                    (true, false) => core::cmp::Ordering::Less,
                     (true, true) => self.cmp(&other),
                 }
             }
 
-            fn cmp_u(&self, other: &Self) -> std::cmp::Ordering {
+            fn cmp_u(&self, other: &Self) -> core::cmp::Ordering {
                 let hi_cmp = self.1.cmp(&other.1);
-                if hi_cmp != std::cmp::Ordering::Equal {
+                if hi_cmp != core::cmp::Ordering::Equal {
                     hi_cmp
                 } else {
                     self.0.cmp(&other.0)
@@ -1050,7 +1110,19 @@ macro_rules! construct_eint_twin {
 
             fn overflowing_mul_s(self, other: Self) -> (Self, bool) {
                 let (lo, hi) = self.widening_mul_s(other);
-                (lo, hi != Self::MIN_U)
+                if !hi.is_negative() {
+                    if hi != Self::MIN_U || lo.is_negative() {
+                        return (lo, true);
+                    } else {
+                        return (lo, false);
+                    }
+                } else {
+                    if hi != Self::MAX_U || lo < Self::MIN_S {
+                        return (lo, true);
+                    } else {
+                        return (lo, false);
+                    }
+                }
             }
 
             fn overflowing_mul_u(self, other: Self) -> (Self, bool) {
@@ -1085,8 +1157,13 @@ macro_rules! construct_eint_twin {
             }
 
             fn put(&self, mem: &mut [u8]) {
-                self.0.put(&mut mem[0..Self::BITS as usize >> 4]);
-                self.1.put(&mut mem[Self::BITS as usize >> 4..Self::BITS as usize >> 3]);
+                unsafe {
+                    core::ptr::copy_nonoverlapping(
+                        self as *const Self as *const u8,
+                        mem.as_mut_ptr(),
+                        Self::BITS as usize >> 3,
+                    );
+                }
             }
 
             fn put_lo(&self, mem: &mut [u8]) {
@@ -1310,7 +1387,7 @@ macro_rules! construct_eint_twin {
 
 macro_rules! uint_twin_from_impl {
     ($name:ident, $half:ty, $from:ty) => {
-        impl std::convert::From<$from> for $name {
+        impl core::convert::From<$from> for $name {
             fn from(small: $from) -> Self {
                 Self(<$half>::from(small), <$half>::MIN_U)
             }
