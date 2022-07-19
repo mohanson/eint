@@ -1,5 +1,6 @@
 #[link(name = "eint-c-impl", kind = "static")]
 extern "C" {
+    pub fn eint_widening_mul(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
     pub fn eint_widening_mul_128_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
     pub fn eint_widening_mul_256_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
     pub fn eint_widening_mul_512_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);

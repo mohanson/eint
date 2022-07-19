@@ -205,7 +205,7 @@ fn test_saturating_sub_u(x: u64, y: u64) {
     assert_eq!(r0, E64(x.saturating_sub(y)))
 }
 
-fn test_widdening_add_s(x: u64, y: u64) {
+fn test_widening_add_s(x: u64, y: u64) {
     let r0 = Eint::widening_add_s(E64::from(x), E64::from(y));
     let r1 = Eint::widening_add_s(T64::recv(x), T64::recv(y));
     let r2 = x as i64 as i128 + y as i64 as i128;
@@ -215,7 +215,7 @@ fn test_widdening_add_s(x: u64, y: u64) {
     assert_eq!(r0.1, E64((r2 as u128 >> 64) as u64));
 }
 
-fn test_widdening_add_u(x: u64, y: u64) {
+fn test_widening_add_u(x: u64, y: u64) {
     let r0 = Eint::widening_add_u(E64::from(x), E64::from(y));
     let r1 = Eint::widening_add_u(T64::recv(x), T64::recv(y));
     let r2 = x as u128 + y as u128;
@@ -225,7 +225,7 @@ fn test_widdening_add_u(x: u64, y: u64) {
     assert_eq!(r0.1, E64((r2 >> 64) as u64));
 }
 
-fn test_widdening_mul_s(x: u64, y: u64) {
+fn test_widening_mul_s(x: u64, y: u64) {
     let r0 = Eint::widening_mul_s(E64::from(x), E64::from(y));
     let r1 = Eint::widening_mul_s(T64::recv(x), T64::recv(y));
     let r2 = (x as i64 as i128 * y as i64 as i128) as u128;
@@ -235,7 +235,7 @@ fn test_widdening_mul_s(x: u64, y: u64) {
     assert_eq!(r0.1, E64((r2 >> 64) as u64));
 }
 
-fn test_widdening_mul_su(x: u64, y: u64) {
+fn test_widening_mul_su(x: u64, y: u64) {
     let r0 = Eint::widening_mul_su(E64::from(x), E64::from(y));
     let r1 = Eint::widening_mul_su(T64::recv(x), T64::recv(y));
     let r2 = (x as i64 as i128 * y as u128 as i128) as u128;
@@ -245,7 +245,7 @@ fn test_widdening_mul_su(x: u64, y: u64) {
     assert_eq!(r0.1, E64((r2 >> 64) as u64));
 }
 
-fn test_widdening_mul_u(x: u64, y: u64) {
+fn test_widening_mul_u(x: u64, y: u64) {
     let r0 = Eint::widening_mul_u(E64::from(x), E64::from(y));
     let r1 = Eint::widening_mul_u(T64::recv(x), T64::recv(y));
     let r2 = x as u128 * y as u128;
@@ -255,7 +255,7 @@ fn test_widdening_mul_u(x: u64, y: u64) {
     assert_eq!(r0.1, E64((r2 >> 64) as u64));
 }
 
-fn test_widdening_sub_s(x: u64, y: u64) {
+fn test_widening_sub_s(x: u64, y: u64) {
     let r0 = Eint::widening_sub_s(E64::from(x), E64::from(y));
     let r1 = Eint::widening_sub_s(T64::recv(x), T64::recv(y));
     let r2 = (x as i64 as i128 - y as i64 as i128) as u128;
@@ -265,7 +265,7 @@ fn test_widdening_sub_s(x: u64, y: u64) {
     assert_eq!(r0.1, E64((r2 >> 64) as u64));
 }
 
-fn test_widdening_sub_u(x: u64, y: u64) {
+fn test_widening_sub_u(x: u64, y: u64) {
     let r0 = Eint::widening_sub_u(E64::from(x), E64::from(y));
     let r1 = Eint::widening_sub_u(T64::recv(x), T64::recv(y));
     let r2 = (x as u128).wrapping_sub(y as u128);
@@ -382,13 +382,13 @@ fuzz_target!(|data: (u64, u64)| {
     test_saturating_add_u(data.0, data.1);
     test_saturating_sub_s(data.0, data.1);
     test_saturating_sub_u(data.0, data.1);
-    test_widdening_add_s(data.0, data.1);
-    test_widdening_add_u(data.0, data.1);
-    test_widdening_mul_s(data.0, data.1);
-    test_widdening_mul_su(data.0, data.1);
-    test_widdening_mul_u(data.0, data.1);
-    test_widdening_sub_s(data.0, data.1);
-    test_widdening_sub_u(data.0, data.1);
+    test_widening_add_s(data.0, data.1);
+    test_widening_add_u(data.0, data.1);
+    test_widening_mul_s(data.0, data.1);
+    test_widening_mul_su(data.0, data.1);
+    test_widening_mul_u(data.0, data.1);
+    test_widening_sub_s(data.0, data.1);
+    test_widening_sub_u(data.0, data.1);
     test_wrapping_add(data.0, data.1);
     test_wrapping_div_s(data.0, data.1);
     test_wrapping_div_u(data.0, data.1);
