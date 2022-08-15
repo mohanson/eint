@@ -1208,9 +1208,8 @@ macro_rules! construct_eint_twin {
             }
 
             fn lo_sext(self) -> Self {
-                let mut b = self.0;
-                if (b[$size / 2 - 1] as i64).is_negative() {
-                    b = Self::MAX_U.0;
+                if (self.0[$size / 2 - 1] as i64).is_negative() {
+                    let mut b = Self::MAX_U.0;
                     b[0..$size / 2].copy_from_slice(&self.0[0..$size / 2]);
                     Self(b)
                 } else {
