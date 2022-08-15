@@ -452,3 +452,24 @@ fn test_widening_mul_u_bug_0() {
     assert_eq!(hi.0[2], 0x000000007b468a1c);
     assert_eq!(hi.0[3], 0x0000000000000000);
 }
+
+#[test]
+fn test_lo_sext() {
+    let x1 = E256([0xb12f7788023e73f4, 0xe2aaa5a70e8d29d2, 0x01f281f891d2d8b6, 0xff000000000923b3]);
+    let x1_1 = E512([
+        0xb12f7788023e73f4,
+        0xe2aaa5a70e8d29d2,
+        0x01f281f891d2d8b6,
+        0xff000000000923b3,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+        0xffffffffffffffff,
+    ]);
+    assert_eq!(E512::from(x1).lo_sext(), x1_1);
+
+    let x1 = E256([0xb12f7788023e73f4, 0xe2aaa5a70e8d29d2, 0x01f281f891d2d8b6, 0x00000000000923b3]);
+    let x1_1 =
+        E512([0xb12f7788023e73f4, 0xe2aaa5a70e8d29d2, 0x01f281f891d2d8b6, 0x00000000000923b3, 0x0, 0x0, 0x0, 0x0]);
+    assert_eq!(E512::from(x1).lo_sext(), x1_1);
+}
