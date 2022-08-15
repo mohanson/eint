@@ -1208,7 +1208,14 @@ macro_rules! construct_eint_twin {
             }
 
             fn lo_sext(self) -> Self {
-                self.wrapping_shl(Self::BITS >> 1).wrapping_sra(Self::BITS >> 1)
+                let mut b = self.0;
+                if (b[$size / 2 - 1] as i64).is_negative() {
+                    b = Self::MAX_U.0;
+                    b[0..$size / 2].copy_from_slice(&self.0[0..$size / 2]);
+                    Self(b)
+                } else {
+                    self
+                }
             }
 
             fn overflowing_add_s(self, other: Self) -> (Self, bool) {
