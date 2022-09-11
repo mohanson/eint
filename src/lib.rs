@@ -8,19 +8,14 @@
 //! ```
 
 #![no_std]
-extern crate alloc;
-use alloc::{format, string::String};
 
-pub trait WideningMulU {
-    fn _widening_mul_u(self, other: Self) -> (Self, Self)
-    where
-        Self: Sized;
+pub trait EintWideningMulU: Sized {
+    fn _widening_mul_u(self, other: Self) -> (Self, Self);
 }
 
-#[macro_export]
 macro_rules! impl_widening_mul_u_wrap {
     ($eint:ty, $wint:ty) => {
-        impl WideningMulU for $eint {
+        impl EintWideningMulU for $eint {
             fn _widening_mul_u(self, other: Self) -> (Self, Self) {
                 let lh = (self.0 as $wint) * (other.0 as $wint);
                 let l = Self::from(lh);
@@ -31,32 +26,9 @@ macro_rules! impl_widening_mul_u_wrap {
     };
 }
 
-#[macro_export]
-macro_rules! impl_widening_mul_u_u128 {
-    ($eint:ty) => {
-        impl WideningMulU for $eint {
-            fn _widening_mul_u(self, other: Self) -> (Self, Self) {
-                let x0 = self.lo();
-                let x1 = self.hi();
-                let y0 = other.lo();
-                let y1 = other.hi();
-                let w0 = x0.wrapping_mul(y0);
-                let t = x1.wrapping_mul(y0).wrapping_add(w0.hi());
-                let w1 = t.lo();
-                let w2 = t.hi();
-                let w1 = x0.wrapping_mul(y1).wrapping_add(w1);
-                let hi = x1.wrapping_mul(y1).wrapping_add(w2).wrapping_add(w1.hi());
-                let lo = self.wrapping_mul(other);
-                (lo, hi)
-            }
-        }
-    };
-}
-
-#[macro_export]
 macro_rules! impl_widening_mul_u_twin {
     ($eint:ty, $size:expr) => {
-        impl WideningMulU for $eint {
+        impl EintWideningMulU for $eint {
             fn _widening_mul_u(self, other: Self) -> (Self, Self) {
                 let mut lh = [0u64; $size * 2];
                 for i in 0..$size {
@@ -122,7 +94,7 @@ pub trait Eint:
     + core::ops::SubAssign
     + core::ops::Shl<u32, Output = Self>
     + core::ops::Shr<u32, Output = Self>
-    + WideningMulU
+    + EintWideningMulU
 {
     const BITS: u32;
     const MAX_S: Self;
@@ -265,7 +237,7 @@ pub trait Eint:
 
     /// Saturating integer subtraction. Computes self - rhs, saturating at the numeric bounds instead of overflowing.
     fn saturating_sub_u(self, other: Self) -> (Self, bool) {
-        if self > other {
+        if self >= other {
             (self.wrapping_sub(other), false)
         } else {
             (Self::MIN_U, true)
@@ -397,7 +369,6 @@ pub trait Eint:
     }
 }
 
-#[macro_export]
 macro_rules! construct_eint_wrap_from_uint {
     ($name:ident, $uint:ty, $from:ty) => {
         impl core::convert::From<$from> for $name {
@@ -408,9 +379,8 @@ macro_rules! construct_eint_wrap_from_uint {
     };
 }
 
-#[macro_export]
 macro_rules! construct_eint_wrap {
-    ($name:ident, $uint:ty, $sint:ty) => {
+    ($name:ident, $uint:ty, $sint:ty, $fstring:expr) => {
         #[derive(Copy, Clone, Default, PartialEq, Eq)]
         pub struct $name(pub $uint);
 
@@ -440,28 +410,19 @@ macro_rules! construct_eint_wrap {
 
         impl core::fmt::Debug for $name {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                let suffix = format!("{:x}", self.0);
-                let prefix = String::from("0").repeat(Self::BITS as usize / 4 - suffix.len());
-                write!(f, "{}", prefix)?;
-                write!(f, "{}", suffix)
+                write!(f, "{:x}", self)
             }
         }
 
         impl core::fmt::Display for $name {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                let suffix = format!("{:x}", self.0);
-                let prefix = String::from("0").repeat(Self::BITS as usize / 4 - suffix.len());
-                write!(f, "{}", prefix)?;
-                write!(f, "{}", suffix)
+                write!(f, "{:x}", self)
             }
         }
 
         impl core::fmt::LowerHex for $name {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                let suffix = format!("{:x}", self.0);
-                let prefix = String::from("0").repeat(Self::BITS as usize / 4 - suffix.len());
-                write!(f, "{}", prefix)?;
-                write!(f, "{}", suffix)
+                write!(f, $fstring, self.0)
             }
         }
 
@@ -805,16 +766,15 @@ macro_rules! uint_wrap_from_impl {
     };
 }
 
-construct_eint_wrap!(E8, u8, i8);
-construct_eint_wrap!(E16, u16, i16);
-construct_eint_wrap!(E32, u32, i32);
-construct_eint_wrap!(E64, u64, i64);
-construct_eint_wrap!(E128, u128, i128);
+construct_eint_wrap!(E8, u8, i8, "{:02x}");
+construct_eint_wrap!(E16, u16, i16, "{:04x}");
+construct_eint_wrap!(E32, u32, i32, "{:08x}");
+construct_eint_wrap!(E64, u64, i64, "{:016x}");
+construct_eint_wrap!(E128, u128, i128, "{:032x}");
 impl_widening_mul_u_wrap!(E8, u16);
 impl_widening_mul_u_wrap!(E16, u32);
 impl_widening_mul_u_wrap!(E32, u64);
 impl_widening_mul_u_wrap!(E64, u128);
-impl_widening_mul_u_u128!(E128);
 uint_wrap_from_impl!(E16, E8);
 uint_wrap_from_impl!(E32, E8);
 uint_wrap_from_impl!(E32, E16);
@@ -826,7 +786,23 @@ uint_wrap_from_impl!(E128, E16);
 uint_wrap_from_impl!(E128, E32);
 uint_wrap_from_impl!(E128, E64);
 
-#[macro_export]
+impl EintWideningMulU for E128 {
+    fn _widening_mul_u(self, other: Self) -> (Self, Self) {
+        let x0 = self.lo();
+        let x1 = self.hi();
+        let y0 = other.lo();
+        let y1 = other.hi();
+        let w0 = x0.wrapping_mul(y0);
+        let t = x1.wrapping_mul(y0).wrapping_add(w0.hi());
+        let w1 = t.lo();
+        let w2 = t.hi();
+        let w1 = x0.wrapping_mul(y1).wrapping_add(w1);
+        let hi = x1.wrapping_mul(y1).wrapping_add(w2).wrapping_add(w1.hi());
+        let lo = self.wrapping_mul(other);
+        (lo, hi)
+    }
+}
+
 macro_rules! construct_eint_twin_from_uint {
     ($name:ident, $from:ty) => {
         impl core::convert::From<$from> for $name {
@@ -845,7 +821,6 @@ macro_rules! construct_eint_twin_from_uint {
     };
 }
 
-#[macro_export]
 macro_rules! construct_eint_twin_from_sint {
     ($name:ident, $from:ty) => {
         impl core::convert::From<$from> for $name {
@@ -868,7 +843,6 @@ macro_rules! construct_eint_twin_from_sint {
     };
 }
 
-#[macro_export]
 macro_rules! construct_eint_twin {
     ($name:ident, $size:expr) => {
         #[derive(Copy, Clone, Default, PartialEq, Eq)]
@@ -909,19 +883,13 @@ macro_rules! construct_eint_twin {
 
         impl core::fmt::Debug for $name {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                for i in self.0.iter().rev() {
-                    write!(f, "{:016x}", i)?
-                }
-                Ok(())
+                write!(f, "{:x}", self)
             }
         }
 
         impl core::fmt::Display for $name {
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                for i in self.0.iter().rev() {
-                    write!(f, "{:016x}", i)?
-                }
-                Ok(())
+                write!(f, "{:x}", self)
             }
         }
 
@@ -1438,253 +1406,6 @@ macro_rules! construct_eint_twin {
         }
 
         impl $name {
-            fn words(bits: usize) -> usize {
-                debug_assert!(bits > 0);
-                1 + (bits - 1) / 64
-            }
-
-            #[inline(always)]
-            const fn mul_u64(a: u64, b: u64, carry: u64) -> (u64, u64) {
-                let (hi, lo) = Self::split_u128(a as u128 * b as u128 + carry as u128);
-                (lo, hi)
-            }
-
-            // #[inline(always)]
-            // const fn split(a: u64) -> (u64, u64) {
-            //     (a >> 32, a & 0xFFFF_FFFF)
-            // }
-
-            #[inline(always)]
-            const fn split_u128(a: u128) -> (u64, u64) {
-                ((a >> 64) as _, (a & 0xFFFFFFFFFFFFFFFF) as _)
-            }
-
-            fn overflowing_mul_u64(mut self, other: u64) -> (Self, u64) {
-                let mut carry = 0u64;
-
-                for d in self.0.iter_mut() {
-                    let (res, c) = Self::mul_u64(*d, other, carry);
-                    *d = res;
-                    carry = c;
-                }
-
-                (self, carry)
-            }
-
-            fn full_mul_u64(self, by: u64) -> [u64; $size + 1] {
-                let (prod, carry) = self.overflowing_mul_u64(by);
-                let mut res = [0u64; $size + 1];
-                res[..$size].copy_from_slice(&prod.0[..]);
-                res[$size] = carry;
-                res
-            }
-
-            #[inline(always)]
-            fn div_mod_word(hi: u64, lo: u64, y: u64) -> (u64, u64) {
-                debug_assert!(hi < y);
-                let x = (u128::from(hi) << 64) + u128::from(lo);
-                let y = u128::from(y);
-                ((x / y) as u64, (x % y) as u64)
-            }
-
-            #[inline(always)]
-            fn add_slice(a: &mut [u64], b: &[u64]) -> bool {
-                Self::binop_slice(a, b, u64::overflowing_add)
-            }
-
-            #[inline(always)]
-            fn sub_slice(a: &mut [u64], b: &[u64]) -> bool {
-                Self::binop_slice(a, b, u64::overflowing_sub)
-            }
-
-            #[inline(always)]
-            fn binop_slice(a: &mut [u64], b: &[u64], binop: impl Fn(u64, u64) -> (u64, bool) + Copy) -> bool {
-                let mut c = false;
-                a.iter_mut().zip(b.iter()).for_each(|(x, y)| {
-                    let (res, carry) = Self::binop_carry(*x, *y, c, binop);
-                    *x = res;
-                    c = carry;
-                });
-                c
-            }
-
-            #[inline(always)]
-            fn binop_carry(a: u64, b: u64, c: bool, binop: impl Fn(u64, u64) -> (u64, bool)) -> (u64, bool) {
-                let (res1, overflow1) = b.overflowing_add(u64::from(c));
-                let (res2, overflow2) = binop(a, res1);
-                (res2, overflow1 || overflow2)
-            }
-
-            #[inline]
-            fn fits_word(&self) -> bool {
-                let arr = self.0;
-                for i in 1..$size {
-                    if arr[i] != 0 {
-                        return false;
-                    }
-                }
-                return true;
-            }
-
-            #[inline]
-            pub fn bits(&self) -> usize {
-                let arr = self.0;
-                for i in 1..$size {
-                    if arr[$size - i] > 0 {
-                        return (0x40 * ($size - i + 1)) - arr[$size - i].leading_zeros() as usize;
-                    }
-                }
-                0x40 - arr[0].leading_zeros() as usize
-            }
-
-            fn full_shl(self, shift: u32) -> [u64; $size + 1] {
-                debug_assert!(shift < 64);
-                let mut u = [0u64; $size + 1];
-                let u_lo = self.0[0] << shift;
-                let u_hi = self >> (64 - shift);
-                u[0] = u_lo;
-                u[1..].copy_from_slice(&u_hi.0[..]);
-                u
-            }
-
-            fn full_shr(u: [u64; $size + 1], shift: u32) -> Self {
-                debug_assert!(shift < 64);
-                let mut res = Self::ZERO;
-                for i in 0..$size {
-                    res.0[i] = u[i] >> shift;
-                }
-                // carry
-                if shift > 0 {
-                    for i in 1..=$size {
-                        res.0[i - 1] |= u[i] << (64 - shift);
-                    }
-                }
-                res
-            }
-
-            fn div_mod_small(mut self, other: u64) -> (Self, Self) {
-                let mut rem = 0u64;
-                self.0.iter_mut().rev().for_each(|d| {
-                    let (q, r) = Self::div_mod_word(rem, *d, other);
-                    *d = q;
-                    rem = r;
-                });
-                (self, rem.into())
-            }
-
-            // See Knuth, TAOCP, Volume 2, section 4.3.1, Algorithm D.
-            fn div_mod_knuth(self, mut v: Self, n: usize, m: usize) -> (Self, Self) {
-                debug_assert!(self.bits() >= v.bits() && !v.fits_word());
-                debug_assert!(n + m <= $size);
-                // D1.
-                // Make sure 64th bit in v's highest word is set.
-                // If we shift both self and v, it won't affect the quotient
-                // and the remainder will only need to be shifted back.
-                let shift = v.0[n - 1].leading_zeros();
-                v = v << shift;
-                // u will store the remainder (shifted)
-                let mut u = self.full_shl(shift);
-
-                // quotient
-                let mut q = Self::ZERO;
-                let v_n_1 = v.0[n - 1];
-                let v_n_2 = v.0[n - 2];
-
-                // D2. D7.
-                // iterate from m downto 0
-                for j in (0..=m).rev() {
-                    let u_jn = u[j + n];
-
-                    // D3.
-                    // q_hat is our guess for the j-th quotient digit
-                    // q_hat = min(b - 1, (u_{j+n} * b + u_{j+n-1}) / v_{n-1})
-                    // b = 1 << WORD_BITS
-                    // Theorem B: q_hat >= q_j >= q_hat - 2
-                    let mut q_hat = if u_jn < v_n_1 {
-                        let (mut q_hat, mut r_hat) = Self::div_mod_word(u_jn, u[j + n - 1], v_n_1);
-                        // this loop takes at most 2 iterations
-                        loop {
-                            // check if q_hat * v_{n-2} > b * r_hat + u_{j+n-2}
-                            let (hi, lo) = Self::split_u128(u128::from(q_hat) * u128::from(v_n_2));
-                            if (hi, lo) <= (r_hat, u[j + n - 2]) {
-                                break;
-                            }
-                            // then iterate till it doesn't hold
-                            q_hat -= 1;
-                            let (new_r_hat, overflow) = r_hat.overflowing_add(v_n_1);
-                            r_hat = new_r_hat;
-                            // if r_hat overflowed, we're done
-                            if overflow {
-                                break;
-                            }
-                        }
-                        q_hat
-                    } else {
-                        // here q_hat >= q_j >= q_hat - 1
-                        u64::max_value()
-                    };
-
-                    // ex. 20:
-                    // since q_hat * v_{n-2} <= b * r_hat + u_{j+n-2},
-                    // either q_hat == q_j, or q_hat == q_j + 1
-
-                    // D4.
-                    // let's assume optimistically q_hat == q_j
-                    // subtract (q_hat * v) from u[j..]
-                    let q_hat_v = v.full_mul_u64(q_hat);
-                    // u[j..] -= q_hat_v;
-                    let c = Self::sub_slice(&mut u[j..], &q_hat_v[..n + 1]);
-
-                    // D6.
-                    // actually, q_hat == q_j + 1 and u[j..] has overflowed
-                    // highly unlikely ~ (1 / 2^63)
-                    if c {
-                        q_hat -= 1;
-                        // add v to u[j..]
-                        let c = Self::add_slice(&mut u[j..], &v.0[..n]);
-                        u[j + n] = u[j + n].wrapping_add(u64::from(c));
-                    }
-
-                    // D5.
-                    q.0[j] = q_hat;
-                }
-
-                // D8.
-                let remainder = Self::full_shr(u, shift);
-
-                (q, remainder)
-            }
-
-            pub fn div_mod(self, other: Self) -> (Self, Self) {
-                // use core::cmp::Ordering;
-
-                let my_bits = self.bits();
-                let your_bits = other.bits();
-
-                assert!(your_bits != 0, "division by zero");
-
-                // Early return in case we are dividing by a larger number than us
-                if my_bits < your_bits {
-                    return (Self::ZERO, self);
-                }
-
-                if your_bits <= 64 {
-                    return self.div_mod_small(other.u64());
-                }
-
-                let (n, m) = {
-                    let my_words = Self::words(my_bits);
-                    let your_words = Self::words(your_bits);
-                    (your_words, my_words - your_words)
-                };
-
-                self.div_mod_knuth(other, n, m)
-            }
-
-            fn div_u(self, other: Self) -> (Self, Self) {
-                self.div_mod(other)
-            }
-
             fn div_s(self, other: Self) -> (Self, Self) {
                 let x = self;
                 let y = other;
@@ -1704,7 +1425,6 @@ macro_rules! construct_eint_twin {
     };
 }
 
-#[macro_export]
 macro_rules! uint_twin_from_impl {
     ($name:ident, $from:ty) => {
         impl core::convert::From<$from> for $name {
@@ -1758,139 +1478,37 @@ uint_twin_from_impl!(E2048, E256);
 uint_twin_from_impl!(E2048, E512);
 uint_twin_from_impl!(E2048, E1024);
 
-pub mod ll {
-    #[link(name = "eint-c-impl", kind = "static")]
-    extern "C" {
-        pub fn c_widening_mul_u(w: *mut u64, x: *const u64, y: *const u64, digits_count: usize);
-        pub fn c_widening_mul_u_128_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
-        pub fn c_widening_mul_u_256_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
-        pub fn c_widening_mul_u_512_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
-        pub fn c_widening_mul_u_1024_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
+use uint::construct_uint;
 
-        pub fn c_wrapping_mul(w: *mut u64, x: *const u64, y: *const u64, digits_count: usize);
-        pub fn c_wrapping_mul_128_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
-        pub fn c_wrapping_mul_256_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
-        pub fn c_wrapping_mul_512_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
-        pub fn c_wrapping_mul_1024_batch(w: *mut u64, x: *const u64, y: *const u64, batch: usize);
+construct_uint! { struct U256(4); }
+construct_uint! { struct U512(8); }
+construct_uint! { struct U1024(16); }
+construct_uint! { struct U2048(32); }
 
-        pub fn c_overflowing_add(w: *mut u64, x: *const u64, y: *const u64, digits_count: usize) -> u64;
-        pub fn c_overflowing_sub(w: *mut u64, x: *const u64, y: *const u64, digits_count: usize) -> u64;
+impl E256 {
+    fn div_u(self, other: Self) -> (Self, Self) {
+        let (quo, rem) = U256(self.0).div_mod(U256(other.0));
+        (Self(quo.0), Self(rem.0))
     }
+}
 
-    pub fn widening_mul_u(w: &mut [u8], x: &[u8], y: &[u8]) {
-        let digits_count = x.len() >> 3;
-        unsafe {
-            c_widening_mul_u(
-                w.as_mut_ptr() as *mut u64,
-                x.as_ptr() as *const u64,
-                y.as_ptr() as *const u64,
-                digits_count,
-            );
-        }
+impl E512 {
+    fn div_u(self, other: Self) -> (Self, Self) {
+        let (quo, rem) = U512(self.0).div_mod(U512(other.0));
+        (Self(quo.0), Self(rem.0))
     }
+}
 
-    pub fn widening_mul_u_128(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
-        unsafe {
-            c_widening_mul_u_128_batch(
-                w.as_ptr() as *mut u64,
-                x.as_ptr() as *const u64,
-                y.as_ptr() as *const u64,
-                batch,
-            );
-        }
+impl E1024 {
+    fn div_u(self, other: Self) -> (Self, Self) {
+        let (quo, rem) = U1024(self.0).div_mod(U1024(other.0));
+        (Self(quo.0), Self(rem.0))
     }
+}
 
-    pub fn widening_mul_u_256(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
-        unsafe {
-            c_widening_mul_u_256_batch(
-                w.as_ptr() as *mut u64,
-                x.as_ptr() as *const u64,
-                y.as_ptr() as *const u64,
-                batch,
-            );
-        }
-    }
-
-    pub fn widening_mul_u_512(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
-        unsafe {
-            c_widening_mul_u_512_batch(
-                w.as_ptr() as *mut u64,
-                x.as_ptr() as *const u64,
-                y.as_ptr() as *const u64,
-                batch,
-            );
-        }
-    }
-
-    pub fn widening_mul_u_1024(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
-        unsafe {
-            c_widening_mul_u_1024_batch(
-                w.as_ptr() as *mut u64,
-                x.as_ptr() as *const u64,
-                y.as_ptr() as *const u64,
-                batch,
-            );
-        }
-    }
-
-    pub fn wrapping_mul_128(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
-        unsafe {
-            c_wrapping_mul_128_batch(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, batch);
-        }
-    }
-
-    pub fn wrapping_mul_256(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
-        unsafe {
-            c_wrapping_mul_256_batch(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, batch);
-        }
-    }
-
-    pub fn wrapping_mul_512(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
-        unsafe {
-            c_wrapping_mul_512_batch(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, batch);
-        }
-    }
-
-    pub fn wrapping_mul_1024(w: &mut [u8], x: &[u8], y: &[u8], batch: usize) {
-        unsafe {
-            c_wrapping_mul_1024_batch(
-                w.as_ptr() as *mut u64,
-                x.as_ptr() as *const u64,
-                y.as_ptr() as *const u64,
-                batch,
-            );
-        }
-    }
-
-    pub fn overflowing_add_128(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
-        unsafe { c_overflowing_add(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 2) }
-    }
-
-    pub fn overflowing_add_256(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
-        unsafe { c_overflowing_add(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 4) }
-    }
-
-    pub fn overflowing_add_512(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
-        unsafe { c_overflowing_add(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 8) }
-    }
-
-    pub fn overflowing_add_1024(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
-        unsafe { c_overflowing_add(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 16) }
-    }
-
-    pub fn overflowing_sub_128(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
-        unsafe { c_overflowing_sub(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 2) }
-    }
-
-    pub fn overflowing_sub_256(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
-        unsafe { c_overflowing_sub(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 4) }
-    }
-
-    pub fn overflowing_sub_512(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
-        unsafe { c_overflowing_sub(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 8) }
-    }
-
-    pub fn overflowing_sub_1024(w: &mut [u8], x: &[u8], y: &[u8]) -> u64 {
-        unsafe { c_overflowing_sub(w.as_ptr() as *mut u64, x.as_ptr() as *const u64, y.as_ptr() as *const u64, 16) }
+impl E2048 {
+    fn div_u(self, other: Self) -> (Self, Self) {
+        let (quo, rem) = U2048(self.0).div_mod(U2048(other.0));
+        (Self(quo.0), Self(rem.0))
     }
 }
