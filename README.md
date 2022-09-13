@@ -4,7 +4,7 @@ Extended precision integer Rust library. Provides signed/unsigned integer 256 to
 
 ```text
 [dependencies]
-eint = "0.1"
+eint = "1.0"
 ```
 
 # Usage
