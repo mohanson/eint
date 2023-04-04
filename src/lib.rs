@@ -4,7 +4,7 @@
 //!
 //! ```text
 //! [dependencies]
-//! eint = "0.1"
+//! eint = "1.1"
 //! ```
 
 #![no_std]
@@ -1323,7 +1323,6 @@ macro_rules! construct_eint_twin {
                 (q1 * twos + q0, (un21 * twos + un0 - q0 * y) >> s)
             }
 
-            /// See https://github.com/Pilatuz/bigx/blob/8615506d17c5/uint128.go#L319
             fn div_u_half_1(self, y: $half) -> (Self, $half) {
                 if self.1 < y {
                     let (lo, r) = self.div_u_half_0(y);
@@ -1335,7 +1334,6 @@ macro_rules! construct_eint_twin {
                 }
             }
 
-            /// See https://github.com/Pilatuz/bigx/blob/8615506d17c5/uint128.go#L291
             fn div_u(self, other: Self) -> (Self, Self) {
                 if other.1 == <$half>::ZERO {
                     let (q, r) = self.div_u_half_1(other.0);
@@ -1358,7 +1356,6 @@ macro_rules! construct_eint_twin {
                 (q, r)
             }
 
-            /// See https://github.com/chfast/intx/blob/2f62de735fe688e9645af8904099f0571f8f0d9c/include/intx/intx.hpp#L789
             fn div_s(self, other: Self) -> (Self, Self) {
                 let x = self;
                 let y = other;
